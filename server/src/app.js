@@ -48,15 +48,21 @@ app.use(helmet({
 }));
 
 // ─── CORS ──────────────────────────────────────────────────────────────────────
-const allowedOrigins = [
-  process.env.CLIENT_URL || 'http://localhost:5173',
-];
+// CLIENT_URL aceita múltiplas origens separadas por vírgula
+const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173')
+  .split(',').map(s => s.trim()).filter(Boolean);
+
+// CORS_ORIGIN_REGEX permite padrões extras (ex: preview deployments do Vercel)
+const originRegex = process.env.CORS_ORIGIN_REGEX
+  ? new RegExp(process.env.CORS_ORIGIN_REGEX)
+  : null;
 
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (mobile apps, curl, Playwright driver)
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (originRegex && originRegex.test(origin)) return callback(null, true);
     callback(new Error(`CORS: origin '${origin}' não permitida`));
   },
   credentials: true,
