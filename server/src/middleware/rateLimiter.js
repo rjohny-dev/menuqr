@@ -1,9 +1,6 @@
 const rateLimit = require('express-rate-limit');
 
-// Strict limiter for login — 5 attempts per 15 min, blocks brute force
-// keyGenerator explícito: usa req.ip que respeita o 'trust proxy' configurado em app.js
-// Sem isso, em produção atrás de proxy, todos os usuários compartilham o mesmo bucket
-const keyGenerator = (req) => req.ip;
+const keyGenerator = (req, res) => rateLimit.ipKeyGenerator(req, res);
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
