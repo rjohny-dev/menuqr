@@ -37,9 +37,14 @@ module.exports = async (req, res, next) => {
         securityLogger.authFailed(req, 'token_revoked');
         return res.status(401).json({ error: 'Sessão encerrada. Faça login novamente.' });
       }
-    } catch {
-      // Se a tabela ainda não existe (ambiente dev sem migration), continuar sem bloquear
-      // Em produção, a migration deve ser aplicada antes do deploy
+    } catch (err) {
+      // 42P01 = "undefined_table" — tabela ainda não foi criada (ambiente dev sem migration)
+      // Qualquer outro erro de banco (timeout, pool esgotado, etc.) falha de forma segura:
+      // rejeita a requisição em vez de deixar um token revogado passar.
+      if (err.code !== '42P01') {
+        securityLogger.authFailed(req, 'blocklist_check_failed');
+        return res.status(503).json({ error: 'Serviço temporariamente indisponível. Tente novamente.' });
+      }
     }
   }
 

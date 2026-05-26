@@ -4,16 +4,18 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TABLE IF NOT EXISTS users (
-  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name          VARCHAR(100) NOT NULL,
-  email         VARCHAR(255) UNIQUE NOT NULL,
-  password_hash VARCHAR(255) NOT NULL,
-  created_at    TIMESTAMP DEFAULT NOW()
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name            VARCHAR(100) NOT NULL,
+  email           VARCHAR(255) UNIQUE NOT NULL,
+  password_hash   VARCHAR(255) NOT NULL,
+  failed_attempts INTEGER DEFAULT 0,
+  locked_until    TIMESTAMP,
+  created_at      TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS restaurants (
   id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id     UUID REFERENCES users(id) ON DELETE CASCADE,
+  user_id     UUID UNIQUE REFERENCES users(id) ON DELETE CASCADE,
   name        VARCHAR(100) NOT NULL,
   slug        VARCHAR(100) UNIQUE NOT NULL,
   logo_url    TEXT,
@@ -42,6 +44,13 @@ CREATE TABLE IF NOT EXISTS items (
   created_at  TIMESTAMP DEFAULT NOW()
 );
 
+-- Token blocklist for JWT revocation on logout
+CREATE TABLE IF NOT EXISTS token_blocklist (
+  jti        TEXT PRIMARY KEY,
+  expires_at TIMESTAMP NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_token_blocklist_expires ON token_blocklist(expires_at);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_restaurants_slug    ON restaurants(slug);
 CREATE INDEX IF NOT EXISTS idx_restaurants_user_id ON restaurants(user_id);
@@ -50,5 +59,20 @@ CREATE INDEX IF NOT EXISTS idx_items_category_id   ON items(category_id);
 CREATE INDEX IF NOT EXISTS idx_items_active        ON items(category_id, active);
 
 -- Migration: add missing columns if upgrading from old schema
-ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS description VARCHAR(500);
-ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS whatsapp    VARCHAR(20);
+ALTER TABLE users        ADD COLUMN IF NOT EXISTS failed_attempts INTEGER DEFAULT 0;
+ALTER TABLE users        ADD COLUMN IF NOT EXISTS locked_until    TIMESTAMP;
+ALTER TABLE restaurants  ADD COLUMN IF NOT EXISTS description     VARCHAR(500);
+ALTER TABLE restaurants  ADD COLUMN IF NOT EXISTS whatsapp        VARCHAR(20);
+
+-- Migration: enforce one restaurant per user (required for ON CONFLICT (user_id))
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'restaurants_user_id_key'
+      AND conrelid = 'restaurants'::regclass
+  ) THEN
+    ALTER TABLE restaurants ADD CONSTRAINT restaurants_user_id_key UNIQUE (user_id);
+  END IF;
+END;
+$$;
