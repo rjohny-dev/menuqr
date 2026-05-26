@@ -5,65 +5,65 @@ import api from '../api';
 export default function PublicMenu() {
   const { slug } = useParams();
   const [menu, setMenu] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
-  const [activeCategory, setActiveCategory] = useState(null);
-  const [cart, setCart] = useState([]);
-  const [cartOpen, setCartOpen] = useState(false);
+  const [carregando, setCarregando] = useState(true);
+  const [naoEncontrado, setNaoEncontrado] = useState(false);
+  const [categoriaAtiva, setCategoriaAtiva] = useState(null);
+  const [carrinho, setCarrinho] = useState([]);
+  const [carrinhoAberto, setCarrinhoAberto] = useState(false);
 
   useEffect(() => {
     api.get(`/menu/${slug}`)
       .then(({ data }) => {
         setMenu(data);
         if (data.categories.length > 0) {
-          setActiveCategory(data.categories[0].id);
+          setCategoriaAtiva(data.categories[0].id);
         }
       })
-      .catch(() => setNotFound(true))
-      .finally(() => setLoading(false));
+      .catch(() => setNaoEncontrado(true))
+      .finally(() => setCarregando(false));
   }, [slug]);
 
-  const addToCart = (item) => {
-    setCart((prev) => {
-      const existing = prev.find((i) => i.id === item.id);
-      if (existing) return prev.map((i) => i.id === item.id ? { ...i, qty: i.qty + 1 } : i);
-      return [...prev, { ...item, qty: 1 }];
+  const adicionarAoCarrinho = (item) => {
+    setCarrinho((anterior) => {
+      const itemExistente = anterior.find((i) => i.id === item.id);
+      if (itemExistente) return anterior.map((i) => i.id === item.id ? { ...i, qty: i.qty + 1 } : i);
+      return [...anterior, { ...item, qty: 1 }];
     });
   };
 
-  const removeFromCart = (itemId) => {
-    setCart((prev) => {
-      const existing = prev.find((i) => i.id === itemId);
-      if (existing?.qty === 1) return prev.filter((i) => i.id !== itemId);
-      return prev.map((i) => i.id === itemId ? { ...i, qty: i.qty - 1 } : i);
+  const removerDoCarrinho = (idDoItem) => {
+    setCarrinho((anterior) => {
+      const itemExistente = anterior.find((i) => i.id === idDoItem);
+      if (itemExistente?.qty === 1) return anterior.filter((i) => i.id !== idDoItem);
+      return anterior.map((i) => i.id === idDoItem ? { ...i, qty: i.qty - 1 } : i);
     });
   };
 
-  const clearCart = () => setCart([]);
+  const limparCarrinho = () => setCarrinho([]);
 
-  const cartTotal = cart.reduce((sum, i) => sum + parseFloat(i.price) * i.qty, 0);
-  const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
+  const totalDoCarrinho = carrinho.reduce((soma, i) => soma + parseFloat(i.price) * i.qty, 0);
+  const quantidadeNoCarrinho = carrinho.reduce((soma, i) => soma + i.qty, 0);
 
-  const fmtPrice = (val) =>
-    parseFloat(val).toFixed(2).replace('.', ',');
+  const formatarPreco = (valor) =>
+    parseFloat(valor).toFixed(2).replace('.', ',');
 
-  const sendWhatsApp = () => {
+  const enviarPedidoWhatsApp = () => {
     if (!menu?.restaurant?.whatsapp) return;
-    const lines = cart.map(
+    const linhasDoPedido = carrinho.map(
       (i) => `• ${i.name} x${i.qty} — R$ ${(parseFloat(i.price) * i.qty).toFixed(2)}`
     );
-    const msg = [
+    const mensagem = [
       `Olá! Gostaria de fazer um pedido:`,
       ``,
-      ...lines,
+      ...linhasDoPedido,
       ``,
-      `*Total: R$ ${cartTotal.toFixed(2)}*`,
+      `*Total: R$ ${totalDoCarrinho.toFixed(2)}*`,
     ].join('\n');
-    const number = `55${menu.restaurant.whatsapp}`;
-    window.open(`https://wa.me/${number}?text=${encodeURIComponent(msg)}`, '_blank');
+    const numero = `55${menu.restaurant.whatsapp}`;
+    window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`, '_blank');
   };
 
-  if (loading) {
+  if (carregando) {
     return (
       <div className="public-loading">
         <div className="spinner" />
@@ -72,7 +72,7 @@ export default function PublicMenu() {
     );
   }
 
-  if (notFound) {
+  if (naoEncontrado) {
     return (
       <div className="public-notfound">
         <h2>Cardápio não encontrado</h2>
@@ -85,7 +85,7 @@ export default function PublicMenu() {
 
   return (
     <div className="public-menu">
-      {/* ── Header ──────────────────────────────────────── */}
+      {/* ── Cabeçalho do restaurante ──────────────────────────── */}
       <header className="public-header">
         <div className="restaurant-row">
           {restaurant.logo_url ? (
@@ -123,57 +123,57 @@ export default function PublicMenu() {
         <div className="public-empty">Cardápio em breve...</div>
       ) : (
         <>
-          {/* ── Category tabs ──────────────────────────── */}
+          {/* ── Abas de categoria ─────────────────────────────── */}
           <nav className="category-nav">
-            {categories.map((cat) => (
+            {categories.map((categoria) => (
               <button
-                key={cat.id}
-                className={`cat-tab ${activeCategory === cat.id ? 'active' : ''}`}
-                onClick={() => setActiveCategory(cat.id)}
+                key={categoria.id}
+                className={`cat-tab ${categoriaAtiva === categoria.id ? 'active' : ''}`}
+                onClick={() => setCategoriaAtiva(categoria.id)}
               >
-                {cat.name}
+                {categoria.name}
               </button>
             ))}
           </nav>
 
-          {/* ── Item sections ──────────────────────────── */}
+          {/* ── Itens do cardápio ─────────────────────────────── */}
           <div className="menu-content">
-            {categories.map((cat) => (
+            {categories.map((categoria) => (
               <section
-                key={cat.id}
-                className={`category-section ${activeCategory === cat.id ? '' : 'hidden'}`}
+                key={categoria.id}
+                className={`category-section ${categoriaAtiva === categoria.id ? '' : 'hidden'}`}
               >
                 <div className="category-header">
-                  <div className="category-eyebrow">{cat.items.length} {cat.items.length === 1 ? 'item' : 'itens'}</div>
-                  <div className="category-title-serif">{cat.name}</div>
+                  <div className="category-eyebrow">{categoria.items.length} {categoria.items.length === 1 ? 'item' : 'itens'}</div>
+                  <div className="category-title-serif">{categoria.name}</div>
                 </div>
 
-                {cat.items.length === 0 ? (
+                {categoria.items.length === 0 ? (
                   <p className="public-empty-cat">Nenhum item disponível nesta categoria.</p>
                 ) : (
                   <div className="menu-list">
-                    {cat.items.map((item) => {
-                      const inCart = cart.find((i) => i.id === item.id);
+                    {categoria.items.map((item) => {
+                      const estaNoCarrinho = carrinho.find((i) => i.id === item.id);
                       return (
                         <div key={item.id} className="menu-item">
                           <div className="menu-item-body">
                             <div className="menu-item-row">
                               <span className="menu-item-name">{item.name}</span>
                               <span className="menu-item-leader" aria-hidden="true" />
-                              <span className="menu-item-price">R$ {fmtPrice(item.price)}</span>
+                              <span className="menu-item-price">R$ {formatarPreco(item.price)}</span>
                             </div>
                             {item.description && (
                               <p className="menu-item-desc">{item.description}</p>
                             )}
                             {restaurant.whatsapp && (
-                              inCart ? (
+                              estaNoCarrinho ? (
                                 <div className="qty-control">
-                                  <button className="qty-btn" onClick={() => removeFromCart(item.id)}>−</button>
-                                  <span className="qty-value">{inCart.qty}</span>
-                                  <button className="qty-btn" onClick={() => addToCart(item)}>+</button>
+                                  <button className="qty-btn" onClick={() => removerDoCarrinho(item.id)}>−</button>
+                                  <span className="qty-value">{estaNoCarrinho.qty}</span>
+                                  <button className="qty-btn" onClick={() => adicionarAoCarrinho(item)}>+</button>
                                 </div>
                               ) : (
-                                <button className="menu-item-add" onClick={() => addToCart(item)}>
+                                <button className="menu-item-add" onClick={() => adicionarAoCarrinho(item)}>
                                   + Adicionar
                                 </button>
                               )
@@ -193,22 +193,22 @@ export default function PublicMenu() {
         </>
       )}
 
-      {/* ── Order bar ───────────────────────────────────── */}
-      {restaurant.whatsapp && cart.length > 0 && (
+      {/* ── Barra de pedido (aparece quando há itens no carrinho) ── */}
+      {restaurant.whatsapp && carrinho.length > 0 && (
         <div className="order-bar">
-          <button className="order-bar-btn" onClick={() => setCartOpen(true)}>
+          <button className="order-bar-btn" onClick={() => setCarrinhoAberto(true)}>
             <span style={{ display: 'flex', alignItems: 'center' }}>
-              <span className="order-bar-count">{cartCount}</span>
+              <span className="order-bar-count">{quantidadeNoCarrinho}</span>
               Ver pedido
             </span>
-            <span className="order-bar-total">R$ {fmtPrice(cartTotal)}</span>
+            <span className="order-bar-total">R$ {formatarPreco(totalDoCarrinho)}</span>
           </button>
         </div>
       )}
 
-      {/* ── Cart drawer ─────────────────────────────────── */}
-      {cartOpen && (
-        <div className="cart-overlay" onClick={() => setCartOpen(false)}>
+      {/* ── Gaveta do carrinho ────────────────────────────────── */}
+      {carrinhoAberto && (
+        <div className="cart-overlay" onClick={() => setCarrinhoAberto(false)}>
           <div className="cart-drawer" onClick={(e) => e.stopPropagation()}>
             <div className="cart-header">
               <div>
@@ -223,22 +223,22 @@ export default function PublicMenu() {
                 </div>
                 <h3>Comanda</h3>
               </div>
-              <button className="cart-close" onClick={() => setCartOpen(false)}>✕</button>
+              <button className="cart-close" onClick={() => setCarrinhoAberto(false)}>✕</button>
             </div>
 
             <div className="cart-items">
-              {cart.map((item) => (
+              {carrinho.map((item) => (
                 <div key={item.id} className="cart-item">
                   <div className="cart-item-info">
                     <span className="cart-item-name">{item.name}</span>
                     <span className="cart-item-price">
-                      R$ {fmtPrice(parseFloat(item.price) * item.qty)}
+                      R$ {formatarPreco(parseFloat(item.price) * item.qty)}
                     </span>
                   </div>
                   <div className="qty-control">
-                    <button className="qty-btn" onClick={() => removeFromCart(item.id)}>−</button>
+                    <button className="qty-btn" onClick={() => removerDoCarrinho(item.id)}>−</button>
                     <span className="qty-value">{item.qty}</span>
-                    <button className="qty-btn" onClick={() => addToCart(item)}>+</button>
+                    <button className="qty-btn" onClick={() => adicionarAoCarrinho(item)}>+</button>
                   </div>
                 </div>
               ))}
@@ -247,15 +247,15 @@ export default function PublicMenu() {
             <div className="cart-footer">
               <div className="cart-total">
                 <span>Total</span>
-                <strong>R$ {fmtPrice(cartTotal)}</strong>
+                <strong>R$ {formatarPreco(totalDoCarrinho)}</strong>
               </div>
-              <button className="btn-whatsapp" onClick={sendWhatsApp}>
+              <button className="btn-whatsapp" onClick={enviarPedidoWhatsApp}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff">
                   <path d="M17.5 14.4c-.3-.1-1.7-.8-2-.9-.3-.1-.5-.1-.7.1-.2.3-.8.9-1 1.1-.2.2-.4.2-.6.1-.3-.1-1.2-.4-2.3-1.4-.8-.7-1.4-1.6-1.6-1.9-.2-.3 0-.4.1-.6l.4-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5 0-.1-.6-1.4-.8-2-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.3-.3.3-.9.9-.9 2.2 0 1.3.9 2.5 1 2.7.1.2 1.8 2.8 4.4 3.9 1.5.6 2.1.7 2.9.5.4-.1 1.4-.6 1.6-1.1.2-.5.2-1 .1-1.1l-.6-.2zM12 2C6.5 2 2 6.5 2 12c0 1.7.4 3.4 1.3 4.9L2 22l5.3-1.4C8.8 21.5 10.4 22 12 22c5.5 0 10-4.5 10-10S17.5 2 12 2z" />
                 </svg>
                 Pedir via WhatsApp
               </button>
-              <button className="btn-clear" onClick={clearCart}>Limpar carrinho</button>
+              <button className="btn-clear" onClick={limparCarrinho}>Limpar carrinho</button>
             </div>
           </div>
         </div>

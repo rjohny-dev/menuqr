@@ -1,15 +1,15 @@
 const pool = require('../db');
 
-// Columns safe to return — never expose internal join keys or future sensitive fields
-const SAFE_COLUMNS = 'id, user_id, name, slug, logo_url, description, whatsapp, created_at';
+// Campos retornados nas respostas — nunca expor campos sensíveis ou chaves internas
+const CAMPOS_DO_RESTAURANTE = 'id, user_id, name, slug, logo_url, description, whatsapp, created_at';
 
 const getRestaurant = async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT ${SAFE_COLUMNS} FROM restaurants WHERE user_id = $1`,
+    const resultado = await pool.query(
+      `SELECT ${CAMPOS_DO_RESTAURANTE} FROM restaurants WHERE user_id = $1`,
       [req.user.userId]
     );
-    res.json(result.rows[0] || null);
+    res.json(resultado.rows[0] || null);
   } catch (err) {
     console.error('getRestaurant error:', err.message);
     res.status(500).json({ error: 'Erro interno do servidor' });
@@ -17,33 +17,32 @@ const getRestaurant = async (req, res) => {
 };
 
 const createRestaurant = async (req, res) => {
-  // Body already sanitized by validate(restaurantCreateSchema)
+  // Dados já validados pelo middleware validate(restaurantCreateSchema)
   const { name, slug, logo_url, description, whatsapp } = req.body;
   try {
-    // Slug uniqueness check antes do INSERT (ON CONFLICT não cobre slug aqui)
-    const slugTaken = await pool.query(
+    // Verifica se o slug já está em uso antes de tentar inserir
+    const slugEmUso = await pool.query(
       'SELECT id FROM restaurants WHERE slug = $1',
       [slug]
     );
-    if (slugTaken.rows.length > 0) {
+    if (slugEmUso.rows.length > 0) {
       return res.status(400).json({ error: 'Esse slug já está em uso' });
     }
 
-    // ON CONFLICT (user_id) elimina a race condition do check-then-insert:
-    // mesmo que dois requests cheguem simultaneamente, apenas um vence.
-    // Requer UNIQUE constraint em restaurants.user_id — ver migration manual.
-    const result = await pool.query(
+    // ON CONFLICT (user_id) protege contra race condition: se dois requests chegarem ao mesmo tempo,
+    // apenas o primeiro cria o restaurante. Requer UNIQUE constraint em restaurants.user_id.
+    const resultado = await pool.query(
       `INSERT INTO restaurants (user_id, name, slug, logo_url, description, whatsapp)
        VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT (user_id) DO NOTHING
-       RETURNING ${SAFE_COLUMNS}`,
+       RETURNING ${CAMPOS_DO_RESTAURANTE}`,
       [req.user.userId, name, slug, logo_url ?? null, description ?? null, whatsapp ?? null]
     );
 
-    if (result.rows.length === 0) {
+    if (resultado.rows.length === 0) {
       return res.status(400).json({ error: 'Você já possui um restaurante' });
     }
-    res.status(201).json(result.rows[0]);
+    res.status(201).json(resultado.rows[0]);
   } catch (err) {
     console.error('createRestaurant error:', err.message);
     res.status(500).json({ error: 'Erro interno do servidor' });
@@ -53,23 +52,28 @@ const createRestaurant = async (req, res) => {
 const updateRestaurant = async (req, res) => {
   const { name, slug, logo_url, description, whatsapp } = req.body;
   try {
-    const current = await pool.query(
+    const restauranteAtual = await pool.query(
       'SELECT id, slug FROM restaurants WHERE user_id = $1',
       [req.user.userId]
     );
-    if (current.rows.length === 0) {
+    if (restauranteAtual.rows.length === 0) {
       return res.status(404).json({ error: 'Restaurante não encontrado' });
     }
-    if (slug && slug !== current.rows[0].slug) {
-      const slugTaken = await pool.query(
+
+    // Verifica conflito de slug só se o slug realmente mudou
+    if (slug && slug !== restauranteAtual.rows[0].slug) {
+      const slugEmUso = await pool.query(
         'SELECT id FROM restaurants WHERE slug = $1 AND user_id != $2',
         [slug, req.user.userId]
       );
-      if (slugTaken.rows.length > 0) {
+      if (slugEmUso.rows.length > 0) {
         return res.status(400).json({ error: 'Esse slug já está em uso' });
       }
     }
-    const result = await pool.query(
+
+    // COALESCE mantém o valor atual se o campo não foi enviado na requisição
+    // CASE para campos que aceitam null explícito (logo, descrição, whatsapp)
+    const resultado = await pool.query(
       `UPDATE restaurants
        SET name        = COALESCE($1, name),
            slug        = COALESCE($2, slug),
@@ -77,10 +81,10 @@ const updateRestaurant = async (req, res) => {
            description = CASE WHEN $4::TEXT IS NOT NULL THEN $4 ELSE description END,
            whatsapp    = CASE WHEN $5::TEXT IS NOT NULL THEN $5 ELSE whatsapp END
        WHERE user_id = $6
-       RETURNING ${SAFE_COLUMNS}`,
+       RETURNING ${CAMPOS_DO_RESTAURANTE}`,
       [name ?? null, slug ?? null, logo_url ?? null, description ?? null, whatsapp ?? null, req.user.userId]
     );
-    res.json(result.rows[0]);
+    res.json(resultado.rows[0]);
   } catch (err) {
     console.error('updateRestaurant error:', err.message);
     res.status(500).json({ error: 'Erro interno do servidor' });

@@ -4,42 +4,43 @@ import api from '../api';
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [usuario, setUsuario] = useState(null);
+  const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
-    // Restore display data only (name/email/id — not the token, which lives in an HttpOnly cookie)
-    const stored = localStorage.getItem('user');
-    if (stored) {
+    // Recupera apenas os dados de exibição (nome/email/id) do localStorage.
+    // O token de autenticação fica em um cookie HttpOnly — o JavaScript não tem acesso a ele.
+    const dadosSalvos = localStorage.getItem('user');
+    if (dadosSalvos) {
       try {
-        setUser(JSON.parse(stored));
+        setUsuario(JSON.parse(dadosSalvos));
       } catch {
         localStorage.removeItem('user');
       }
     }
-    setLoading(false);
+    setCarregando(false);
   }, []);
 
-  // Called after successful login/register — receives user object only (no token)
-  const login = (userData) => {
-    localStorage.setItem('user', JSON.stringify(userData));
-    setUser(userData);
+  // Chamado após login ou cadastro bem-sucedido — salva apenas os dados do usuário (sem token)
+  const login = (dadosDoUsuario) => {
+    localStorage.setItem('user', JSON.stringify(dadosDoUsuario));
+    setUsuario(dadosDoUsuario);
   };
 
   const logout = async () => {
     try {
-      await api.post('/auth/logout'); // clears the HttpOnly cookie server-side
+      await api.post('/auth/logout'); // remove o cookie HttpOnly no servidor
     } catch {
-      // proceed regardless — clear local state
+      // mesmo com erro na API, limpa o estado local
     }
     localStorage.removeItem('user');
-    setUser(null);
+    setUsuario(null);
     window.location.href = '/login';
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
-      {!loading && children}
+    <AuthContext.Provider value={{ user: usuario, login, logout, loading: carregando }}>
+      {!carregando && children}
     </AuthContext.Provider>
   );
 }

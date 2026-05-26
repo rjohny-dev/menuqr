@@ -5,28 +5,28 @@ import Navbar from '../components/Navbar';
 import api from '../api';
 
 export default function Dashboard() {
-  const [restaurant, setRestaurant] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
+  const [restaurante, setRestaurante] = useState(null);
+  const [carregando, setCarregando] = useState(true);
+  const [linkCopiado, setLinkCopiado] = useState(false);
 
   useEffect(() => {
     api.get('/restaurant')
-      .then(({ data }) => setRestaurant(data))
+      .then(({ data }) => setRestaurante(data))
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => setCarregando(false));
   }, []);
 
-  const menuUrl = restaurant
-    ? `${window.location.origin}/menu/${restaurant.slug}`
+  const urlDoCardapio = restaurante
+    ? `${window.location.origin}/menu/${restaurante.slug}`
     : '';
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(menuUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const copiarLink = () => {
+    navigator.clipboard.writeText(urlDoCardapio);
+    setLinkCopiado(true);
+    setTimeout(() => setLinkCopiado(false), 2000);
   };
 
-  if (loading) {
+  if (carregando) {
     return (
       <>
         <Navbar />
@@ -35,7 +35,7 @@ export default function Dashboard() {
     );
   }
 
-  if (!restaurant) {
+  if (!restaurante) {
     return (
       <>
         <Navbar />
@@ -58,12 +58,12 @@ export default function Dashboard() {
       <Navbar />
       <div className="page-container">
         <div className="dashboard-header">
-          {restaurant.logo_url && (
-            <img src={restaurant.logo_url} alt="Logo" className="restaurant-logo" />
+          {restaurante.logo_url && (
+            <img src={restaurante.logo_url} alt="Logo" className="restaurant-logo" />
           )}
           <div>
-            <h1>{restaurant.name}</h1>
-            <p className="text-muted">menuqr.app/menu/{restaurant.slug}</p>
+            <h1>{restaurante.name}</h1>
+            <p className="text-muted">menuqr.app/menu/{restaurante.slug}</p>
           </div>
         </div>
 
@@ -72,7 +72,7 @@ export default function Dashboard() {
             <h3>QR Code do Cardápio</h3>
             <div className="qr-container">
               <QRCodeSVG
-                value={menuUrl}
+                value={urlDoCardapio}
                 size={180}
                 bgColor="#ffffff"
                 fgColor="#1e293b"
@@ -80,13 +80,13 @@ export default function Dashboard() {
               />
             </div>
             <p className="qr-link">
-              <a href={menuUrl} target="_blank" rel="noreferrer">{menuUrl}</a>
+              <a href={urlDoCardapio} target="_blank" rel="noreferrer">{urlDoCardapio}</a>
             </p>
             <div className="qr-actions">
-              <button className="btn-secondary" onClick={handleCopy}>
-                {copied ? '✓ Copiado!' : 'Copiar Link'}
+              <button className="btn-secondary" onClick={copiarLink}>
+                {linkCopiado ? '✓ Copiado!' : 'Copiar Link'}
               </button>
-              <a href={menuUrl} target="_blank" rel="noreferrer" className="btn-primary">
+              <a href={urlDoCardapio} target="_blank" rel="noreferrer" className="btn-primary">
                 Abrir Cardápio
               </a>
             </div>
@@ -109,7 +109,7 @@ export default function Dashboard() {
                   <p>Nome, slug e logo do restaurante</p>
                 </div>
               </Link>
-              <a href={menuUrl} target="_blank" rel="noreferrer" className="action-item">
+              <a href={urlDoCardapio} target="_blank" rel="noreferrer" className="action-item">
                 <span className="action-icon">👁️</span>
                 <div>
                   <strong>Ver como Cliente</strong>

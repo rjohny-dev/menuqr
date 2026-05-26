@@ -4,62 +4,62 @@ import Navbar from '../components/Navbar';
 import api from '../api';
 
 export default function Categories() {
-  const [categories, setCategories] = useState([]);
-  const [form, setForm] = useState({ name: '' });
-  const [editId, setEditId] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [categorias, setCategorias] = useState([]);
+  const [formulario, setFormulario] = useState({ name: '' });
+  const [idEmEdicao, setIdEmEdicao] = useState(null);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState('');
 
   useEffect(() => {
-    fetchCategories();
+    carregarCategorias();
   }, []);
 
-  const fetchCategories = async () => {
+  const carregarCategorias = async () => {
     try {
       const { data } = await api.get('/categories');
-      setCategories(data);
+      setCategorias(data);
     } catch {
-      setError('Erro ao carregar categorias');
+      setErro('Erro ao carregar categorias');
     } finally {
-      setLoading(false);
+      setCarregando(false);
     }
   };
 
-  const handleSubmit = async (e) => {
+  const salvarCategoria = async (e) => {
     e.preventDefault();
-    setError('');
+    setErro('');
     try {
-      if (editId) {
-        const { data } = await api.put(`/categories/${editId}`, form);
-        setCategories(categories.map((c) => (c.id === editId ? data : c)));
-        setEditId(null);
+      if (idEmEdicao) {
+        const { data } = await api.put(`/categories/${idEmEdicao}`, formulario);
+        setCategorias(categorias.map((c) => (c.id === idEmEdicao ? data : c)));
+        setIdEmEdicao(null);
       } else {
-        const { data } = await api.post('/categories', form);
-        setCategories([...categories, data]);
+        const { data } = await api.post('/categories', formulario);
+        setCategorias([...categorias, data]);
       }
-      setForm({ name: '' });
+      setFormulario({ name: '' });
     } catch (err) {
-      setError(err.response?.data?.error || 'Erro ao salvar categoria');
+      setErro(err.response?.data?.error || 'Erro ao salvar categoria');
     }
   };
 
-  const handleEdit = (cat) => {
-    setEditId(cat.id);
-    setForm({ name: cat.name });
+  const iniciarEdicao = (categoria) => {
+    setIdEmEdicao(categoria.id);
+    setFormulario({ name: categoria.name });
   };
 
-  const handleCancel = () => {
-    setEditId(null);
-    setForm({ name: '' });
+  const cancelarEdicao = () => {
+    setIdEmEdicao(null);
+    setFormulario({ name: '' });
   };
 
-  const handleDelete = async (id) => {
+  const deletarCategoria = async (id) => {
     if (!window.confirm('Deletar esta categoria? Todos os itens serão removidos.')) return;
     try {
       await api.delete(`/categories/${id}`);
-      setCategories(categories.filter((c) => c.id !== id));
+      setCategorias(categorias.filter((c) => c.id !== id));
     } catch {
-      setError('Erro ao deletar categoria');
+      setErro('Erro ao deletar categoria');
     }
   };
 
@@ -74,26 +74,26 @@ export default function Categories() {
 
         <div className="content-grid">
           <div className="card">
-            <h3>{editId ? 'Editar Categoria' : 'Nova Categoria'}</h3>
-            <form onSubmit={handleSubmit}>
+            <h3>{idEmEdicao ? 'Editar Categoria' : 'Nova Categoria'}</h3>
+            <form onSubmit={salvarCategoria}>
               <div className="form-group">
                 <label>Nome da categoria</label>
                 <input
                   type="text"
-                  value={form.name}
-                  onChange={(e) => setForm({ name: e.target.value })}
+                  value={formulario.name}
+                  onChange={(e) => setFormulario({ name: e.target.value })}
                   placeholder="Ex: Lanches, Bebidas..."
                   required
                   autoFocus
                 />
               </div>
-              {error && <div className="error-message">{error}</div>}
+              {erro && <div className="error-message">{erro}</div>}
               <div className="form-actions">
                 <button type="submit" className="btn-primary">
-                  {editId ? 'Salvar alterações' : 'Adicionar categoria'}
+                  {idEmEdicao ? 'Salvar alterações' : 'Adicionar categoria'}
                 </button>
-                {editId && (
-                  <button type="button" className="btn-secondary" onClick={handleCancel}>
+                {idEmEdicao && (
+                  <button type="button" className="btn-secondary" onClick={cancelarEdicao}>
                     Cancelar
                   </button>
                 )}
@@ -102,36 +102,36 @@ export default function Categories() {
           </div>
 
           <div>
-            {loading ? (
+            {carregando ? (
               <div className="loading">Carregando categorias...</div>
-            ) : categories.length === 0 ? (
+            ) : categorias.length === 0 ? (
               <div className="empty-state card">
                 <p>Nenhuma categoria cadastrada ainda.<br />Adicione sua primeira categoria!</p>
               </div>
             ) : (
               <div className="list">
-                {categories.map((cat) => (
-                  <div key={cat.id} className="list-item">
+                {categorias.map((categoria) => (
+                  <div key={categoria.id} className="list-item">
                     <div className="list-item-icon">🗂️</div>
                     <div className="list-item-info">
-                      <strong>{cat.name}</strong>
+                      <strong>{categoria.name}</strong>
                     </div>
                     <div className="list-item-actions">
                       <Link
-                        to={`/categories/${cat.id}/items`}
+                        to={`/categories/${categoria.id}/items`}
                         className="btn-sm btn-primary"
                       >
                         Itens
                       </Link>
                       <button
                         className="btn-sm btn-secondary"
-                        onClick={() => handleEdit(cat)}
+                        onClick={() => iniciarEdicao(categoria)}
                       >
                         Editar
                       </button>
                       <button
                         className="btn-sm btn-danger"
-                        onClick={() => handleDelete(cat.id)}
+                        onClick={() => deletarCategoria(categoria.id)}
                       >
                         Deletar
                       </button>

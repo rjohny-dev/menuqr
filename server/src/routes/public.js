@@ -1,7 +1,7 @@
 const router = require('express').Router();
-const { getMenuBySlug } = require('../controllers/public');
+const { buscarCardapioPublico } = require('../controllers/public');
 const { publicLimiter } = require('../middleware/rateLimiter');
 
-router.get('/:slug', publicLimiter, getMenuBySlug);
+router.get('/:slug', publicLimiter, buscarCardapioPublico);
 
 module.exports = router;

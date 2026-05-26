@@ -4,63 +4,63 @@ import Navbar from '../components/Navbar';
 import ImageUploadField from '../components/ImageUploadField';
 import api from '../api';
 
-const EMPTY_FORM = { name: '', description: '', price: '', image_url: '' };
+const FORMULARIO_VAZIO = { name: '', description: '', price: '', image_url: '' };
 
 export default function Items() {
   const { categoryId } = useParams();
-  const [items, setItems] = useState([]);
-  const [categoryName, setCategoryName] = useState('');
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [editId, setEditId] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [itens, setItens] = useState([]);
+  const [nomeCategoria, setNomeCategoria] = useState('');
+  const [formulario, setFormulario] = useState(FORMULARIO_VAZIO);
+  const [idEmEdicao, setIdEmEdicao] = useState(null);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState('');
 
   useEffect(() => {
-    fetchItems();
-    fetchCategoryName();
+    carregarItens();
+    carregarNomeDaCategoria();
   }, [categoryId]);
 
-  const fetchItems = async () => {
+  const carregarItens = async () => {
     try {
       const { data } = await api.get(`/items/category/${categoryId}`);
-      setItems(data);
+      setItens(data);
     } catch {
-      setError('Erro ao carregar itens');
+      setErro('Erro ao carregar itens');
     } finally {
-      setLoading(false);
+      setCarregando(false);
     }
   };
 
-  const fetchCategoryName = async () => {
+  const carregarNomeDaCategoria = async () => {
     try {
       const { data } = await api.get('/categories');
-      const cat = data.find((c) => c.id === categoryId);
-      if (cat) setCategoryName(cat.name);
+      const categoriaEncontrada = data.find((c) => c.id === categoryId);
+      if (categoriaEncontrada) setNomeCategoria(categoriaEncontrada.name);
     } catch {}
   };
 
-  const handleSubmit = async (e) => {
+  const salvarItem = async (e) => {
     e.preventDefault();
-    setError('');
+    setErro('');
     try {
-      const payload = { ...form, price: parseFloat(form.price) };
-      if (editId) {
-        const { data } = await api.put(`/items/${editId}`, payload);
-        setItems(items.map((i) => (i.id === editId ? data : i)));
-        setEditId(null);
+      const dadosParaEnviar = { ...formulario, price: parseFloat(formulario.price) };
+      if (idEmEdicao) {
+        const { data } = await api.put(`/items/${idEmEdicao}`, dadosParaEnviar);
+        setItens(itens.map((i) => (i.id === idEmEdicao ? data : i)));
+        setIdEmEdicao(null);
       } else {
-        const { data } = await api.post(`/items/category/${categoryId}`, payload);
-        setItems([...items, data]);
+        const { data } = await api.post(`/items/category/${categoryId}`, dadosParaEnviar);
+        setItens([...itens, data]);
       }
-      setForm(EMPTY_FORM);
+      setFormulario(FORMULARIO_VAZIO);
     } catch (err) {
-      setError(err.response?.data?.error || 'Erro ao salvar item');
+      setErro(err.response?.data?.error || 'Erro ao salvar item');
     }
   };
 
-  const handleEdit = (item) => {
-    setEditId(item.id);
-    setForm({
+  const iniciarEdicao = (item) => {
+    setIdEmEdicao(item.id);
+    setFormulario({
       name: item.name,
       description: item.description || '',
       price: item.price.toString(),
@@ -68,27 +68,27 @@ export default function Items() {
     });
   };
 
-  const handleCancel = () => {
-    setEditId(null);
-    setForm(EMPTY_FORM);
+  const cancelarEdicao = () => {
+    setIdEmEdicao(null);
+    setFormulario(FORMULARIO_VAZIO);
   };
 
-  const handleToggleActive = async (item) => {
+  const alternarStatusDoItem = async (item) => {
     try {
       const { data } = await api.put(`/items/${item.id}`, { active: !item.active });
-      setItems(items.map((i) => (i.id === item.id ? data : i)));
+      setItens(itens.map((i) => (i.id === item.id ? data : i)));
     } catch {
-      setError('Erro ao atualizar item');
+      setErro('Erro ao atualizar item');
     }
   };
 
-  const handleDelete = async (id) => {
+  const deletarItem = async (id) => {
     if (!window.confirm('Deletar este item permanentemente?')) return;
     try {
       await api.delete(`/items/${id}`);
-      setItems(items.filter((i) => i.id !== id));
+      setItens(itens.filter((i) => i.id !== id));
     } catch {
-      setError('Erro ao deletar item');
+      setErro('Erro ao deletar item');
     }
   };
 
@@ -98,19 +98,19 @@ export default function Items() {
       <div className="page-container">
         <div className="page-header">
           <Link to="/categories" className="back-link">← Voltar para categorias</Link>
-          <h2>Itens: {categoryName}</h2>
+          <h2>Itens: {nomeCategoria}</h2>
         </div>
 
         <div className="content-grid">
           <div className="card">
-            <h3>{editId ? 'Editar Item' : 'Novo Item'}</h3>
-            <form onSubmit={handleSubmit}>
+            <h3>{idEmEdicao ? 'Editar Item' : 'Novo Item'}</h3>
+            <form onSubmit={salvarItem}>
               <div className="form-group">
                 <label>Nome *</label>
                 <input
                   type="text"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  value={formulario.name}
+                  onChange={(e) => setFormulario({ ...formulario, name: e.target.value })}
                   placeholder="Ex: X-Burguer especial"
                   required
                 />
@@ -118,8 +118,8 @@ export default function Items() {
               <div className="form-group">
                 <label>Descrição</label>
                 <textarea
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  value={formulario.description}
+                  onChange={(e) => setFormulario({ ...formulario, description: e.target.value })}
                   placeholder="Ingredientes, tamanho, observações..."
                   rows={3}
                 />
@@ -130,24 +130,24 @@ export default function Items() {
                   type="number"
                   step="0.01"
                   min="0"
-                  value={form.price}
-                  onChange={(e) => setForm({ ...form, price: e.target.value })}
+                  value={formulario.price}
+                  onChange={(e) => setFormulario({ ...formulario, price: e.target.value })}
                   placeholder="0,00"
                   required
                 />
               </div>
               <ImageUploadField
                 label="Foto"
-                value={form.image_url}
-                onChange={(url) => setForm({ ...form, image_url: url })}
+                value={formulario.image_url}
+                onChange={(url) => setFormulario({ ...formulario, image_url: url })}
               />
-              {error && <div className="error-message">{error}</div>}
+              {erro && <div className="error-message">{erro}</div>}
               <div className="form-actions">
                 <button type="submit" className="btn-primary">
-                  {editId ? 'Salvar alterações' : 'Adicionar item'}
+                  {idEmEdicao ? 'Salvar alterações' : 'Adicionar item'}
                 </button>
-                {editId && (
-                  <button type="button" className="btn-secondary" onClick={handleCancel}>
+                {idEmEdicao && (
+                  <button type="button" className="btn-secondary" onClick={cancelarEdicao}>
                     Cancelar
                   </button>
                 )}
@@ -156,15 +156,15 @@ export default function Items() {
           </div>
 
           <div>
-            {loading ? (
+            {carregando ? (
               <div className="loading">Carregando itens...</div>
-            ) : items.length === 0 ? (
+            ) : itens.length === 0 ? (
               <div className="empty-state card">
                 <p>Nenhum item cadastrado nesta categoria.</p>
               </div>
             ) : (
               <div className="list">
-                {items.map((item) => (
+                {itens.map((item) => (
                   <div key={item.id} className={`list-item ${!item.active ? 'inactive' : ''}`}>
                     {item.image_url && (
                       <img src={item.image_url} alt={item.name} className="item-thumb" />
@@ -182,14 +182,14 @@ export default function Items() {
                     <div className="list-item-actions">
                       <button
                         className={`btn-sm ${item.active ? 'btn-secondary' : 'btn-primary'}`}
-                        onClick={() => handleToggleActive(item)}
+                        onClick={() => alternarStatusDoItem(item)}
                       >
                         {item.active ? 'Desativar' : 'Ativar'}
                       </button>
-                      <button className="btn-sm btn-secondary" onClick={() => handleEdit(item)}>
+                      <button className="btn-sm btn-secondary" onClick={() => iniciarEdicao(item)}>
                         Editar
                       </button>
-                      <button className="btn-sm btn-danger" onClick={() => handleDelete(item.id)}>
+                      <button className="btn-sm btn-danger" onClick={() => deletarItem(item.id)}>
                         Deletar
                       </button>
                     </div>
