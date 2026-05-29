@@ -115,10 +115,25 @@ const itemCreateSchema = z.object({
 
 const itemUpdateSchema = itemCreateSchema.partial();
 
+const forgotPasswordSchema = z.object({
+  email: z.string().email('Email inválido').max(255).toLowerCase().trim(),
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1, 'Token obrigatório'),
+  password: z.string()
+    .min(8, 'Senha deve ter pelo menos 8 caracteres')
+    .max(128, 'Senha muito longa')
+    .regex(/[A-Z]/, 'Senha deve conter pelo menos uma letra maiúscula')
+    .regex(/[0-9]/, 'Senha deve conter pelo menos um número'),
+});
+
 module.exports = {
   validate,
   registerSchema,
   loginSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
   restaurantCreateSchema,
   restaurantUpdateSchema,
   categoryCreateSchema,

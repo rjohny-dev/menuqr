@@ -29,7 +29,7 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     try {
-      await api.post('/auth/logout'); // remove o cookie HttpOnly no servidor
+      await api.post('/auth/logout'); // remove access token + refresh token no servidor
     } catch {
       // mesmo com erro na API, limpa o estado local
     }
