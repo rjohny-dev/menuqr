@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../api';
 
@@ -10,6 +10,10 @@ export default function PublicMenu() {
   const [categoriaAtiva, setCategoriaAtiva] = useState(null);
   const [carrinho, setCarrinho] = useState([]);
   const [carrinhoAberto, setCarrinhoAberto] = useState(false);
+  const [corte, setCorte] = useState(null);
+  const [dropdownAberto, setDropdownAberto] = useState(false);
+  const navRef = useRef(null);
+  const measureRef = useRef(null);
 
   useEffect(() => {
     api.get(`/menu/${slug}`)
@@ -22,6 +26,47 @@ export default function PublicMenu() {
       .catch(() => setNaoEncontrado(true))
       .finally(() => setCarregando(false));
   }, [slug]);
+
+  const calcularCorte = useCallback(() => {
+    const nav = navRef.current;
+    const measure = measureRef.current;
+    if (!nav || !measure || !measure.children.length) return;
+    const navWidth = nav.offsetWidth;
+    const GAP = 18;
+    const MAIS_WIDTH = 72;
+    const tabs = Array.from(measure.children);
+    let usado = 0;
+    let novoCorte = tabs.length;
+    for (let i = 0; i < tabs.length; i++) {
+      const w = tabs[i].offsetWidth;
+      const eUltimo = i === tabs.length - 1;
+      if (usado + w + (eUltimo ? 0 : GAP + MAIS_WIDTH) > navWidth) {
+        novoCorte = i;
+        break;
+      }
+      usado += w + GAP;
+    }
+    setCorte(novoCorte < tabs.length ? novoCorte : null);
+  }, []);
+
+  useEffect(() => {
+    if (!menu) return;
+    calcularCorte();
+    const nav = navRef.current;
+    if (!nav) return;
+    const observer = new ResizeObserver(calcularCorte);
+    observer.observe(nav);
+    return () => observer.disconnect();
+  }, [menu, calcularCorte]);
+
+  useEffect(() => {
+    if (!dropdownAberto) return;
+    const handler = (e) => {
+      if (!e.target.closest('.cat-mais-wrapper')) setDropdownAberto(false);
+    };
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [dropdownAberto]);
 
   const adicionarAoCarrinho = (item) => {
     setCarrinho((anterior) => {
@@ -124,16 +169,48 @@ export default function PublicMenu() {
       ) : (
         <>
           {/* ── Abas de categoria ─────────────────────────────── */}
-          <nav className="category-nav">
-            {categories.map((categoria) => (
-              <button
-                key={categoria.id}
-                className={`cat-tab ${categoriaAtiva === categoria.id ? 'active' : ''}`}
-                onClick={() => setCategoriaAtiva(categoria.id)}
-              >
-                {categoria.name}
-              </button>
+          <div ref={measureRef} className="cat-measure" aria-hidden="true">
+            {categories.map((cat) => (
+              <button key={cat.id} className="cat-tab">{cat.name}</button>
             ))}
+          </div>
+          <nav ref={navRef} className="category-nav">
+            {categories.map((categoria, i) =>
+              corte === null || i < corte ? (
+                <button
+                  key={categoria.id}
+                  className={`cat-tab ${categoriaAtiva === categoria.id ? 'active' : ''}`}
+                  onClick={() => setCategoriaAtiva(categoria.id)}
+                >
+                  {categoria.name}
+                </button>
+              ) : null
+            )}
+            {corte !== null && (
+              <div className="cat-mais-wrapper">
+                <button
+                  className={`cat-mais ${categories.slice(corte).some((c) => c.id === categoriaAtiva) ? 'active' : ''}`}
+                  onClick={() => setDropdownAberto((a) => !a)}
+                >
+                  {categories.slice(corte).some((c) => c.id === categoriaAtiva)
+                    ? categories.find((c) => c.id === categoriaAtiva)?.name
+                    : 'Mais'} ▾
+                </button>
+                {dropdownAberto && (
+                  <div className="cat-dropdown">
+                    {categories.slice(corte).map((cat) => (
+                      <button
+                        key={cat.id}
+                        className={`cat-dropdown-item ${categoriaAtiva === cat.id ? 'active' : ''}`}
+                        onClick={() => { setCategoriaAtiva(cat.id); setDropdownAberto(false); }}
+                      >
+                        {cat.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </nav>
 
           {/* ── Itens do cardápio ─────────────────────────────── */}

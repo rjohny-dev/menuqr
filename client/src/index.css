@@ -795,23 +795,30 @@ a { color: inherit; }
 }
 
 /* Tabs de categoria */
-.category-nav {
+.cat-measure {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: nowrap;
   display: flex;
   gap: 18px;
   padding: 14px 20px;
-  overflow-x: auto;
+  top: 0;
+  left: 0;
+}
+
+.category-nav {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 20px;
+  overflow: hidden;
   border-bottom: 1px solid var(--line);
   background: var(--paper);
   position: sticky;
   top: 0;
   z-index: 10;
-  scrollbar-width: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  -webkit-overflow-scrolling: touch;
 }
-
-.category-nav::-webkit-scrollbar { display: none; }
 
 .cat-tab {
   font: 400 22px/1 var(--serif);
@@ -846,6 +853,80 @@ a { color: inherit; }
   bottom: -1px;
   height: 2px;
   background: var(--tomate);
+}
+
+/* Dropdown de overflow de categorias */
+.cat-mais-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.cat-mais {
+  font: 400 22px/1 var(--serif);
+  color: var(--ink-3);
+  letter-spacing: -0.3px;
+  padding-bottom: 4px;
+  white-space: nowrap;
+  position: relative;
+  cursor: pointer;
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  transition: color 0.15s;
+}
+
+.cat-mais:hover { color: var(--ink); }
+
+.cat-mais.active {
+  font-style: italic;
+  color: var(--ink);
+}
+
+.cat-mais.active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--tomate);
+}
+
+.cat-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.10);
+  min-width: 160px;
+  z-index: 30;
+  padding: 8px 0;
+}
+
+.cat-dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: 400 18px/1 var(--serif);
+  color: var(--ink-3);
+  padding: 10px 20px;
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+
+.cat-dropdown-item:hover { color: var(--ink); background: var(--paper-2); }
+
+.cat-dropdown-item.active {
+  font-style: italic;
+  color: var(--ink);
 }
 
 /* Category section content */
