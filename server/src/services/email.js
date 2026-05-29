@@ -4,17 +4,18 @@ let _transporter = null;
 const getTransporter = () => {
   if (!_transporter) {
     _transporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp-relay.brevo.com',
+      port: 587,
       auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD,
+        user: process.env.BREVO_SMTP_LOGIN,
+        pass: process.env.BREVO_SMTP_PASSWORD,
       },
     });
   }
   return _transporter;
 };
 
-const FROM = `MenuQR <${process.env.GMAIL_USER}>`;
+const FROM = `MenuQR <${process.env.BREVO_SENDER_EMAIL}>`;
 
 const getBaseUrl = () => {
   const urls = (process.env.CLIENT_URL || 'http://localhost:5173').split(',');
