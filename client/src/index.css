@@ -812,7 +812,6 @@ a { color: inherit; }
   align-items: center;
   gap: 18px;
   padding: 14px 20px;
-  overflow: hidden;
   border-bottom: 1px solid var(--line);
   background: var(--paper);
   position: sticky;
