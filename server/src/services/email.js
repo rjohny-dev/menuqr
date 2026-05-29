@@ -1,15 +1,23 @@
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 
-let _resend = null;
-const getResend = () => {
-  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY);
-  return _resend;
+let _transporter = null;
+const getTransporter = () => {
+  if (!_transporter) {
+    _transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_APP_PASSWORD,
+      },
+    });
+  }
+  return _transporter;
 };
-const FROM = process.env.EMAIL_FROM || 'MenuQR <noreply@menuqr.com.br>';
+
+const FROM = `MenuQR <${process.env.GMAIL_USER}>`;
 
 const getBaseUrl = () => {
   const urls = (process.env.CLIENT_URL || 'http://localhost:5173').split(',');
-  // Prefere URL de produção (https) em vez de localhost
   const prod = urls.find((u) => u.trim().startsWith('https'));
   return (prod || urls[0]).trim();
 };
@@ -28,7 +36,7 @@ const base = (content) => `<!DOCTYPE html>
 
 const sendVerificationEmail = async (email, name, token) => {
   const url = `${getBaseUrl()}/verify-email?token=${token}`;
-  await getResend().emails.send({
+  await getTransporter().sendMail({
     from: FROM,
     to: email,
     subject: 'Confirme seu email — MenuQR',
@@ -43,7 +51,7 @@ const sendVerificationEmail = async (email, name, token) => {
 
 const sendPasswordResetEmail = async (email, name, token) => {
   const url = `${getBaseUrl()}/reset-password?token=${token}`;
-  await getResend().emails.send({
+  await getTransporter().sendMail({
     from: FROM,
     to: email,
     subject: 'Redefinir senha — MenuQR',
