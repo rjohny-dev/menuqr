@@ -1,6 +1,10 @@
 const { Resend } = require('resend');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let _resend = null;
+const getResend = () => {
+  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY);
+  return _resend;
+};
 const FROM = process.env.EMAIL_FROM || 'MenuQR <noreply@menuqr.com.br>';
 
 const getBaseUrl = () => {
@@ -24,7 +28,7 @@ const base = (content) => `<!DOCTYPE html>
 
 const sendVerificationEmail = async (email, name, token) => {
   const url = `${getBaseUrl()}/verify-email?token=${token}`;
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM,
     to: email,
     subject: 'Confirme seu email — MenuQR',
@@ -39,7 +43,7 @@ const sendVerificationEmail = async (email, name, token) => {
 
 const sendPasswordResetEmail = async (email, name, token) => {
   const url = `${getBaseUrl()}/reset-password?token=${token}`;
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM,
     to: email,
     subject: 'Redefinir senha — MenuQR',
