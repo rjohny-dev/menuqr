@@ -1,26 +1,30 @@
-const nodemailer = require('nodemailer');
-
-let _transporter = null;
-const getTransporter = () => {
-  if (!_transporter) {
-    _transporter = nodemailer.createTransport({
-      host: 'smtp-relay.brevo.com',
-      port: 587,
-      auth: {
-        user: process.env.BREVO_SMTP_LOGIN,
-        pass: process.env.BREVO_SMTP_PASSWORD,
-      },
-    });
-  }
-  return _transporter;
-};
-
-const FROM = `MenuQR <${process.env.BREVO_SENDER_EMAIL}>`;
+const BREVO_URL = 'https://api.brevo.com/v3/smtp/email';
 
 const getBaseUrl = () => {
   const urls = (process.env.CLIENT_URL || 'http://localhost:5173').split(',');
   const prod = urls.find((u) => u.trim().startsWith('https'));
   return (prod || urls[0]).trim();
+};
+
+const sendEmail = async ({ to, toName, subject, html }) => {
+  const res = await fetch(BREVO_URL, {
+    method: 'POST',
+    headers: {
+      'api-key': process.env.BREVO_API_KEY,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      sender: { name: 'MenuQR', email: process.env.BREVO_SENDER_EMAIL },
+      to: [{ email: to, name: toName }],
+      subject,
+      htmlContent: html,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Brevo API error: ${res.status} ${err}`);
+  }
 };
 
 const base = (content) => `<!DOCTYPE html>
@@ -37,9 +41,9 @@ const base = (content) => `<!DOCTYPE html>
 
 const sendVerificationEmail = async (email, name, token) => {
   const url = `${getBaseUrl()}/verify-email?token=${token}`;
-  await getTransporter().sendMail({
-    from: FROM,
+  await sendEmail({
     to: email,
+    toName: name,
     subject: 'Confirme seu email — MenuQR',
     html: base(`
       <h2 style="margin:0 0 8px;color:#1F1812;font-size:20px">Olá, ${name}!</h2>
@@ -52,9 +56,9 @@ const sendVerificationEmail = async (email, name, token) => {
 
 const sendPasswordResetEmail = async (email, name, token) => {
   const url = `${getBaseUrl()}/reset-password?token=${token}`;
-  await getTransporter().sendMail({
-    from: FROM,
+  await sendEmail({
     to: email,
+    toName: name,
     subject: 'Redefinir senha — MenuQR',
     html: base(`
       <h2 style="margin:0 0 8px;color:#1F1812;font-size:20px">Redefinir senha</h2>
