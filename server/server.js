@@ -7,5 +7,5 @@ const app = require('./src/app');
 const PORT = process.env.PORT || 3001;
 
 app.listen(PORT, () => {
-  console.log(`MenuQR server running on port ${PORT}`);
+  console.log(`MenuQR server running on port ${PORT} — v${new Date().toISOString().slice(0,10)}`);
 });

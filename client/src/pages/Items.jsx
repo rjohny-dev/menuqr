@@ -66,6 +66,8 @@ export default function Items() {
         const { data } = await api.post(`/items/category/${categoryId}`, dados);
         setItens([...itens, data]);
         setFormulario(FORMULARIO_VAZIO);
+        // Entra automaticamente em modo edição para o painel de opções aparecer
+        setIdEmEdicao(data.id);
       }
     } catch (err) {
       setErro(err.response?.data?.error || 'Erro ao salvar item');
