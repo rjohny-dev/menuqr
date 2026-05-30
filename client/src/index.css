@@ -1165,7 +1165,7 @@ a { color: inherit; }
   letter-spacing: -1px;
 }
 
-/* ─── Order bar (replaces FAB) ───────────────────────────── */
+/* ─── Order bar (tablet/pc — sempre visível) ─────────────── */
 .order-bar {
   position: fixed;
   bottom: 0;
@@ -1176,6 +1176,7 @@ a { color: inherit; }
   border-top: 1px solid var(--line);
   box-shadow: var(--sh-up);
   z-index: 50;
+  display: none; /* hidden on mobile, shown on tablet/pc */
 }
 
 .order-bar-btn {
@@ -1212,7 +1213,18 @@ a { color: inherit; }
 
 .order-bar-total { font: 400 18px var(--serif); }
 
-/* ─── Cart FAB (legacy compat) ───────────────────────────── */
+.order-bar-empty {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--ink-3);
+  font: italic 400 14px var(--serif);
+  letter-spacing: 0.01em;
+}
+
+/* ─── Cart FAB (mobile) ──────────────────────────────────── */
 .cart-fab {
   position: fixed;
   bottom: 1.75rem;
@@ -1223,25 +1235,29 @@ a { color: inherit; }
   width: 62px;
   height: 62px;
   border-radius: 50%;
-  font-size: 1.5rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 50;
   box-shadow: 0 4px 16px rgba(200,70,46,0.35);
+  transition: transform 0.15s, background 0.15s;
 }
+
+.cart-fab:hover { background: var(--tomate-d); transform: scale(1.05); }
+.cart-fab:active { transform: scale(0.97); }
 
 .cart-fab-count {
   position: absolute;
   top: -4px;
   right: -4px;
-  background: var(--tomate-d);
-  color: white;
+  background: var(--ink);
+  color: var(--paper);
   font: 700 0.68rem var(--sans);
-  width: 20px;
+  min-width: 20px;
   height: 20px;
-  border-radius: 50%;
+  padding: 0 4px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1484,6 +1500,28 @@ a { color: inherit; }
   .page-header { flex-direction: column; align-items: flex-start; gap: 16px; }
   .page-header h2 { font-size: 36px !important; }
   .dashboard-header h1 { font-size: 36px !important; }
+}
+
+/* ─── Carrinho: mobile = FAB, tablet/pc = barra inferior ── */
+@media (max-width: 767px) {
+  /* Mostra FAB, esconde barra */
+  .cart-fab { display: flex; }
+  .order-bar { display: none !important; }
+  /* Drawer ocupa tela toda no mobile */
+  .cart-drawer { max-width: 100%; border-radius: 20px 20px 0 0; }
+}
+
+@media (min-width: 768px) {
+  /* Esconde FAB, mostra barra */
+  .cart-fab { display: none !important; }
+  .order-bar { display: block; }
+  /* Drawer alinhado à direita e largura limitada em telas maiores */
+  .cart-overlay { justify-content: flex-end; }
+  .cart-drawer {
+    max-width: 440px;
+    border-radius: 20px 20px 0 0;
+  }
+  .cart-drawer::before { display: none; }
 }
 
 @media (max-width: 375px) {
