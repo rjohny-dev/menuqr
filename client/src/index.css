@@ -1444,6 +1444,51 @@ a { color: inherit; }
 
 .btn-clear:hover { color: var(--ink-2); }
 
+.btn-clear-confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-clear-confirm span {
+  font: 500 12px var(--sans);
+  color: var(--ink-2);
+}
+
+.btn-clear-confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-clear-sim {
+  height: 32px;
+  padding: 0 16px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--tomate);
+  background: none;
+  color: var(--tomate);
+  font: 500 12px var(--sans);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.btn-clear-sim:hover { background: var(--tomate); color: #fff; }
+
+.btn-clear-nao {
+  height: 32px;
+  padding: 0 16px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--ink-3);
+  font: 500 12px var(--sans);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.btn-clear-nao:hover { border-color: var(--ink-3); color: var(--ink-2); }
+
 /* ─── Public states ──────────────────────────────────────── */
 .public-loading,
 .public-notfound {

@@ -16,6 +16,7 @@ export default function PublicMenu() {
     } catch { return []; }
   });
   const [carrinhoAberto, setCarrinhoAberto] = useState(false);
+  const [confirmandoLimpeza, setConfirmandoLimpeza] = useState(false);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [corte, setCorte] = useState(null);
   const [dropdownAberto, setDropdownAberto] = useState(false);
@@ -103,7 +104,7 @@ export default function PublicMenu() {
     });
   };
 
-  const limparCarrinho = () => setCarrinho([]);
+  const limparCarrinho = () => { setCarrinho([]); setConfirmandoLimpeza(false); };
 
   const totalDoCarrinho = carrinho.reduce((soma, i) => soma + parseFloat(i.price) * i.qty, 0);
   const quantidadeNoCarrinho = carrinho.reduce((soma, i) => soma + i.qty, 0);
@@ -333,7 +334,7 @@ export default function PublicMenu() {
 
       {/* ── Gaveta do carrinho ────────────────────────────────── */}
       {carrinhoAberto && (
-        <div className="cart-overlay" onClick={() => setCarrinhoAberto(false)}>
+        <div className="cart-overlay" onClick={() => setCarrinhoAberto(false); setConfirmandoLimpeza(false)}>
           <div className="cart-drawer" onClick={(e) => e.stopPropagation()}>
             <div className="cart-header">
               <div>
@@ -348,7 +349,7 @@ export default function PublicMenu() {
                 </div>
                 <h3>Comanda</h3>
               </div>
-              <button className="cart-close" onClick={() => setCarrinhoAberto(false)}>✕</button>
+              <button className="cart-close" onClick={() => setCarrinhoAberto(false); setConfirmandoLimpeza(false)}>✕</button>
             </div>
 
             <div className="cart-items">
@@ -380,7 +381,17 @@ export default function PublicMenu() {
                 </svg>
                 Pedir via WhatsApp
               </button>
-              <button className="btn-clear" onClick={limparCarrinho}>Limpar carrinho</button>
+              {confirmandoLimpeza ? (
+                <div className="btn-clear-confirm">
+                  <span>Limpar o carrinho?</span>
+                  <div className="btn-clear-confirm-actions">
+                    <button className="btn-clear-sim" onClick={limparCarrinho}>Sim, limpar</button>
+                    <button className="btn-clear-nao" onClick={() => setConfirmandoLimpeza(false)}>Cancelar</button>
+                  </div>
+                </div>
+              ) : (
+                <button className="btn-clear" onClick={() => setConfirmandoLimpeza(true)}>Limpar carrinho</button>
+              )}
             </div>
           </div>
         </div>
