@@ -8,7 +8,12 @@ export default function PublicMenu() {
   const [carregando, setCarregando] = useState(true);
   const [naoEncontrado, setNaoEncontrado] = useState(false);
   const [categoriaAtiva, setCategoriaAtiva] = useState(null);
-  const [carrinho, setCarrinho] = useState([]);
+  const [carrinho, setCarrinho] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`menuqr_cart_${slug}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
   const [carrinhoAberto, setCarrinhoAberto] = useState(false);
   const [corte, setCorte] = useState(null);
   const [dropdownAberto, setDropdownAberto] = useState(false);
@@ -26,6 +31,12 @@ export default function PublicMenu() {
       .catch(() => setNaoEncontrado(true))
       .finally(() => setCarregando(false));
   }, [slug]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(`menuqr_cart_${slug}`, JSON.stringify(carrinho));
+    } catch {}
+  }, [carrinho, slug]);
 
   const calcularCorte = useCallback(() => {
     const nav = navRef.current;

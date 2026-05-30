@@ -1236,10 +1236,10 @@ a { color: inherit; }
   height: 62px;
   border-radius: 50%;
   cursor: pointer;
-  display: flex;
+  display: none; /* shown only on mobile via @media (max-width: 767px) */
   align-items: center;
   justify-content: center;
-  z-index: 50;
+  z-index: 100;
   box-shadow: 0 4px 16px rgba(200,70,46,0.35);
   transition: transform 0.15s, background 0.15s;
 }
