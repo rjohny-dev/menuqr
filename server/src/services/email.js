@@ -1,5 +1,12 @@
 const BREVO_URL = 'https://api.brevo.com/v3/smtp/email';
 
+const esc = (s) =>
+  String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
 const getBaseUrl = () => {
   const urls = (process.env.CLIENT_URL || 'http://localhost:5173').split(',');
   const prod = urls.find((u) => u.trim().startsWith('https'));
@@ -46,7 +53,7 @@ const sendVerificationEmail = async (email, name, token) => {
     toName: name,
     subject: 'Confirme seu email — MenuQR',
     html: base(`
-      <h2 style="margin:0 0 8px;color:#1F1812;font-size:20px">Olá, ${name}!</h2>
+      <h2 style="margin:0 0 8px;color:#1F1812;font-size:20px">Olá, ${esc(name)}!</h2>
       <p style="color:#3D3530;line-height:1.6">Clique no botão abaixo para confirmar seu email e ativar sua conta.</p>
       <a href="${url}" style="display:inline-block;margin:24px 0;padding:12px 28px;background:#C8462E;color:#fff;text-decoration:none;border-radius:6px;font-weight:600">Confirmar email</a>
       <p style="color:#8B7D6B;font-size:13px">O link expira em 24 horas.<br>Se o botão não funcionar: <a href="${url}" style="color:#C8462E;word-break:break-all">${url}</a></p>
@@ -62,7 +69,7 @@ const sendPasswordResetEmail = async (email, name, token) => {
     subject: 'Redefinir senha — MenuQR',
     html: base(`
       <h2 style="margin:0 0 8px;color:#1F1812;font-size:20px">Redefinir senha</h2>
-      <p style="color:#3D3530;line-height:1.6">Recebemos uma solicitação para redefinir a senha de <strong>${email}</strong>.</p>
+      <p style="color:#3D3530;line-height:1.6">Recebemos uma solicitação para redefinir a senha de <strong>${esc(email)}</strong>.</p>
       <a href="${url}" style="display:inline-block;margin:24px 0;padding:12px 28px;background:#C8462E;color:#fff;text-decoration:none;border-radius:6px;font-weight:600">Redefinir senha</a>
       <p style="color:#8B7D6B;font-size:13px">O link expira em 1 hora. Se não foi você, ignore este email — sua senha permanece a mesma.</p>
     `),

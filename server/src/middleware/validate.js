@@ -115,6 +115,10 @@ const itemCreateSchema = z.object({
 
 const itemUpdateSchema = itemCreateSchema.partial();
 
+const resendVerificationSchema = z.object({
+  email: z.string().email('Email inválido').max(255).toLowerCase().trim(),
+});
+
 const forgotPasswordSchema = z.object({
   email: z.string().email('Email inválido').max(255).toLowerCase().trim(),
 });
@@ -132,6 +136,7 @@ module.exports = {
   validate,
   registerSchema,
   loginSchema,
+  resendVerificationSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
   restaurantCreateSchema,

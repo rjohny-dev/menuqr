@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
   email                       VARCHAR(255) UNIQUE NOT NULL,
   password_hash               VARCHAR(255) NOT NULL,
   email_verified              BOOLEAN DEFAULT false,
-  verification_token          TEXT,
+  verification_token_hash     TEXT,
   verification_token_expires  TIMESTAMP,
   reset_token_hash            TEXT,
   reset_token_expires         TIMESTAMP,
@@ -77,12 +77,25 @@ CREATE INDEX IF NOT EXISTS idx_items_active        ON items(category_id, active)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_attempts            INTEGER DEFAULT 0;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until               TIMESTAMP;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified             BOOLEAN DEFAULT false;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token         TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_expires TIMESTAMP;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_hash           TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires        TIMESTAMP;
 ALTER TABLE restaurants  ADD COLUMN IF NOT EXISTS description     VARCHAR(500);
 ALTER TABLE restaurants  ADD COLUMN IF NOT EXISTS whatsapp        VARCHAR(20);
+
+-- Migration: rename verification_token (plaintext) → verification_token_hash
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'users' AND column_name = 'verification_token'
+  ) THEN
+    ALTER TABLE users RENAME COLUMN verification_token TO verification_token_hash;
+  END IF;
+END $$;
+
+-- Migration: add verification_token_hash if not present (fresh DB via old ADD COLUMN path)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_hash TEXT;
 
 -- Migration: enforce one restaurant per user (required for ON CONFLICT (user_id))
 DO $$

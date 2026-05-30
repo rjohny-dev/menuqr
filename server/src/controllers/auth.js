@@ -8,7 +8,6 @@ const { sendVerificationEmail, sendPasswordResetEmail } = require('../services/e
 const RODADAS_DO_HASH = 12;
 const HASH_FICTICIO = '$2a$12$dpON0CCVF2PN9oeX8o1icOWjSaCaSKJIHew7Ava5a3ZliH7jjFlEe';
 
-// Cookies: access token (2h) e refresh token (7 dias)
 const cookieOpts = (maxAgeMs) => ({
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
@@ -45,9 +44,9 @@ const register = async (req, res) => {
     const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
 
     const resultado = await pool.query(
-      `INSERT INTO users (name, email, password_hash, verification_token, verification_token_expires)
+      `INSERT INTO users (name, email, password_hash, verification_token_hash, verification_token_expires)
        VALUES ($1, $2, $3, $4, $5) RETURNING id, name, email`,
-      [name, email, password_hash, verificationToken, verificationExpires]
+      [name, email, password_hash, hashToken(verificationToken), verificationExpires]
     );
     const usuario = resultado.rows[0];
 
@@ -57,7 +56,6 @@ const register = async (req, res) => {
       await sendVerificationEmail(email, name, verificationToken);
     } catch (emailErr) {
       console.error('email send error:', emailErr.message);
-      // Não bloqueia o cadastro se o email falhar — usuário pode reenviar depois
     }
 
     res.status(201).json({
@@ -111,10 +109,8 @@ const login = async (req, res) => {
 
     await pool.query('UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = $1', [usuario.id]);
 
-    // Access token
     const accessToken = gerarAccessToken(usuario.id);
 
-    // Refresh token — armazenado no banco como hash SHA-256
     const refreshToken = crypto.randomBytes(48).toString('hex');
     const refreshExpires = new Date(Date.now() + REFRESH_DAYS * 24 * 60 * 60 * 1000);
     await pool.query(
@@ -136,31 +132,51 @@ const login = async (req, res) => {
 // ─── Refresh ──────────────────────────────────────────────────────────────────
 
 const refresh = async (req, res) => {
-  const refreshToken = req.cookies?.refresh_token;
-  if (!refreshToken) return res.status(401).json({ error: 'Refresh token ausente' });
+  const oldRefreshToken = req.cookies?.refresh_token;
+  if (!oldRefreshToken) return res.status(401).json({ error: 'Refresh token ausente' });
 
+  const client = await pool.connect();
   try {
-    const resultado = await pool.query(
-      `SELECT rt.id, rt.user_id, u.name, u.email
-       FROM refresh_tokens rt
-       JOIN users u ON u.id = rt.user_id
-       WHERE rt.token_hash = $1 AND rt.expires_at > NOW()`,
-      [hashToken(refreshToken)]
+    await client.query('BEGIN');
+
+    const resultado = await client.query(
+      `DELETE FROM refresh_tokens
+       WHERE token_hash = $1 AND expires_at > NOW()
+       RETURNING user_id`,
+      [hashToken(oldRefreshToken)]
     );
 
     if (resultado.rows.length === 0) {
+      await client.query('ROLLBACK');
       res.clearCookie('refresh_token', { path: '/' });
       return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
     }
 
-    const { user_id, name, email } = resultado.rows[0];
+    const { user_id } = resultado.rows[0];
+
+    const userResult = await client.query('SELECT name, email FROM users WHERE id = $1', [user_id]);
+    const { name, email } = userResult.rows[0];
+
     const newAccessToken = gerarAccessToken(user_id);
+    const newRefreshToken = crypto.randomBytes(48).toString('hex');
+    const refreshExpires = new Date(Date.now() + REFRESH_DAYS * 24 * 60 * 60 * 1000);
+
+    await client.query(
+      'INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)',
+      [user_id, hashToken(newRefreshToken), refreshExpires]
+    );
+
+    await client.query('COMMIT');
 
     res.cookie('token', newAccessToken, cookieOpts(2 * 60 * 60 * 1000));
+    res.cookie('refresh_token', newRefreshToken, cookieOpts(REFRESH_DAYS * 24 * 60 * 60 * 1000));
     res.json({ user: { id: user_id, name, email } });
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error('refresh error:', err.message);
     res.status(500).json({ error: 'Erro interno do servidor' });
+  } finally {
+    client.release();
   }
 };
 
@@ -204,10 +220,10 @@ const verifyEmail = async (req, res) => {
   try {
     const resultado = await pool.query(
       `UPDATE users
-       SET email_verified = true, verification_token = NULL, verification_token_expires = NULL
-       WHERE verification_token = $1 AND verification_token_expires > NOW()
+       SET email_verified = true, verification_token_hash = NULL, verification_token_expires = NULL
+       WHERE verification_token_hash = $1 AND verification_token_expires > NOW()
        RETURNING id, email`,
-      [token]
+      [hashToken(token)]
     );
 
     if (resultado.rows.length === 0) {
@@ -241,8 +257,8 @@ const resendVerification = async (req, res) => {
     const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     await pool.query(
-      'UPDATE users SET verification_token = $1, verification_token_expires = $2 WHERE id = $3',
-      [token, expires, usuario.id]
+      'UPDATE users SET verification_token_hash = $1, verification_token_expires = $2 WHERE id = $3',
+      [hashToken(token), expires, usuario.id]
     );
 
     await sendVerificationEmail(email, usuario.name, token);
@@ -258,7 +274,6 @@ const resendVerification = async (req, res) => {
 
 const forgotPassword = async (req, res) => {
   const { email } = req.body;
-  // Sempre retorna 200 — não revela se o email existe
   const MSG = 'Se este email estiver cadastrado, você receberá as instruções em breve.';
 
   try {
@@ -310,7 +325,6 @@ const resetPassword = async (req, res) => {
       [password_hash, resultado.rows[0].id]
     );
 
-    // Invalida todos os refresh tokens do usuário após troca de senha
     await pool.query('DELETE FROM refresh_tokens WHERE user_id = $1', [resultado.rows[0].id]);
 
     res.json({ message: 'Senha redefinida com sucesso. Faça login com a nova senha.' });
