@@ -115,6 +115,26 @@ const itemCreateSchema = z.object({
 
 const itemUpdateSchema = itemCreateSchema.partial();
 
+// ─── Option groups & options ──────────────────────────────────────────────────
+
+const optionGroupCreateSchema = z.object({
+  name:     z.string({ required_error: 'Nome é obrigatório' }).min(1).max(100).trim(),
+  required: z.boolean().optional(),
+  min_qty:  z.number().int().min(0).max(20).optional(),
+  max_qty:  z.number().int().min(1).max(20).optional(),
+  order:    z.number().int().min(0).optional(),
+});
+
+const optionGroupUpdateSchema = optionGroupCreateSchema.partial();
+
+const optionCreateSchema = z.object({
+  name:      z.string({ required_error: 'Nome é obrigatório' }).min(1).max(100).trim(),
+  price_add: z.number().min(0).max(99999.99).optional(),
+  order:     z.number().int().min(0).optional(),
+});
+
+const optionUpdateSchema = optionCreateSchema.partial();
+
 const resendVerificationSchema = z.object({
   email: z.string().email('Email inválido').max(255).toLowerCase().trim(),
 });
@@ -145,4 +165,8 @@ module.exports = {
   categoryUpdateSchema,
   itemCreateSchema,
   itemUpdateSchema,
+  optionGroupCreateSchema,
+  optionGroupUpdateSchema,
+  optionCreateSchema,
+  optionUpdateSchema,
 };

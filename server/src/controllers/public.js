@@ -1,12 +1,10 @@
 const pool = require('../db');
 
-// Regex que define o formato válido de um slug: letras minúsculas, números e hífens
 const FORMATO_SLUG = /^[a-z0-9-]{2,100}$/;
 
 const buscarCardapioPublico = async (req, res) => {
   const { slug } = req.params;
 
-  // Valida o slug antes de consultar o banco — evita queries desnecessárias e path traversal
   if (!FORMATO_SLUG.test(slug)) {
     return res.status(404).json({ error: 'Cardápio não encontrado' });
   }
@@ -21,7 +19,7 @@ const buscarCardapioPublico = async (req, res) => {
     }
     const restaurante = resultadoRestaurante.rows[0];
 
-    // Uma única query com JOIN em vez de um loop N+1 (mais eficiente e sem amplificação de DoS)
+    // Query 1: categorias + itens (sem N+1)
     const resultadoLinhas = await pool.query(
       `SELECT
          c.id          AS id_categoria,
@@ -42,7 +40,58 @@ const buscarCardapioPublico = async (req, res) => {
       [restaurante.id]
     );
 
-    // Monta a estrutura de categorias + itens a partir das linhas planas do JOIN
+    // Query 2: grupos de opções + opções de todos os itens do restaurante
+    const resultadoOpcoes = await pool.query(
+      `SELECT
+         g.id          AS group_id,
+         g.item_id,
+         g.name        AS group_name,
+         g.required,
+         g.min_qty,
+         g.max_qty,
+         g."order"     AS group_order,
+         o.id          AS option_id,
+         o.name        AS option_name,
+         o.price_add,
+         o."order"     AS option_order
+       FROM item_option_groups g
+       LEFT JOIN item_options o ON o.group_id = g.id
+       WHERE g.item_id IN (
+         SELECT i.id FROM items i
+         JOIN categories c ON c.id = i.category_id
+         WHERE c.restaurant_id = $1 AND i.active = true
+       )
+       ORDER BY g.item_id, g."order" ASC, g.created_at ASC, o."order" ASC, o.created_at ASC`,
+      [restaurante.id]
+    );
+
+    // Monta mapa: itemId → Map(groupId → grupo com opções)
+    const opcoesMap = new Map();
+    for (const row of resultadoOpcoes.rows) {
+      if (!opcoesMap.has(row.item_id)) opcoesMap.set(row.item_id, new Map());
+      const grupos = opcoesMap.get(row.item_id);
+      if (!grupos.has(row.group_id)) {
+        grupos.set(row.group_id, {
+          id: row.group_id,
+          name: row.group_name,
+          required: row.required,
+          min_qty: row.min_qty,
+          max_qty: row.max_qty,
+          order: row.group_order,
+          options: [],
+        });
+      }
+      if (row.option_id) {
+        grupos.get(row.group_id).options.push({
+          id: row.option_id,
+          name: row.option_name,
+          price_add: row.price_add,
+          order: row.option_order,
+        });
+      }
+    }
+
+    // Monta estrutura final: categorias → itens (com option_groups embutido)
     const mapaDeCategoria = new Map();
     for (const linha of resultadoLinhas.rows) {
       if (!mapaDeCategoria.has(linha.id_categoria)) {
@@ -55,6 +104,7 @@ const buscarCardapioPublico = async (req, res) => {
         });
       }
       if (linha.id_item) {
+        const grupos = opcoesMap.get(linha.id_item);
         mapaDeCategoria.get(linha.id_categoria).items.push({
           id: linha.id_item,
           name: linha.nome_item,
@@ -63,6 +113,7 @@ const buscarCardapioPublico = async (req, res) => {
           image_url: linha.foto_item,
           order: linha.ordem_item,
           created_at: linha.criado_em_item,
+          option_groups: grupos ? [...grupos.values()] : [],
         });
       }
     }

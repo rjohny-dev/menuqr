@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth');
 const restaurantRoutes = require('./routes/restaurant');
 const categoriesRoutes = require('./routes/categories');
 const itemsRoutes = require('./routes/items');
+const optionGroupsRoutes = require('./routes/optionGroups');
 const publicRoutes = require('./routes/public');
 const uploadRoutes = require('./routes/upload');
 const { apiLimiter, healthLimiter } = require('./middleware/rateLimiter');
@@ -83,6 +84,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/restaurant', restaurantRoutes);
 app.use('/api/categories', categoriesRoutes);
 app.use('/api/items', itemsRoutes);
+app.use('/api/option-groups', optionGroupsRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/menu', publicRoutes);
 

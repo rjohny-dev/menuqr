@@ -3,12 +3,24 @@ import { createPortal } from 'react-dom';
 import { useParams } from 'react-router-dom';
 import api from '../api';
 
+// Preço unitário de uma entrada do carrinho (base + acréscimos das opções)
+const calcularPrecoUnitario = (entrada) => {
+  const acrescimos = (entrada.opcoesGrupos || []).reduce(
+    (soma, g) => soma + g.opcoesSelecionadas.reduce((s, o) => s + parseFloat(o.acrescimo || 0), 0),
+    0
+  );
+  return parseFloat(entrada.price) + acrescimos;
+};
+
+const formatarPreco = (valor) => parseFloat(valor).toFixed(2).replace('.', ',');
+
 export default function PublicMenu() {
   const { slug } = useParams();
   const [menu, setMenu] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const [naoEncontrado, setNaoEncontrado] = useState(false);
   const [categoriaAtiva, setCategoriaAtiva] = useState(null);
+
   const [carrinho, setCarrinho] = useState(() => {
     try {
       const saved = localStorage.getItem(`menuqr_cart_${slug}`);
@@ -18,6 +30,12 @@ export default function PublicMenu() {
   const [carrinhoAberto, setCarrinhoAberto] = useState(false);
   const [confirmandoLimpeza, setConfirmandoLimpeza] = useState(false);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+
+  // Modal de produto
+  const [itemModal, setItemModal] = useState(null);
+  const [selecoes, setSelecoes] = useState({});   // { groupId: optionId[] }
+  const [qtdModal, setQtdModal] = useState(1);
+
   const [corte, setCorte] = useState(null);
   const [dropdownAberto, setDropdownAberto] = useState(false);
   const navRef = useRef(null);
@@ -27,18 +45,14 @@ export default function PublicMenu() {
     api.get(`/menu/${slug}`)
       .then(({ data }) => {
         setMenu(data);
-        if (data.categories.length > 0) {
-          setCategoriaAtiva(data.categories[0].id);
-        }
+        if (data.categories.length > 0) setCategoriaAtiva(data.categories[0].id);
       })
       .catch(() => setNaoEncontrado(true))
       .finally(() => setCarregando(false));
   }, [slug]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(`menuqr_cart_${slug}`, JSON.stringify(carrinho));
-    } catch {}
+    try { localStorage.setItem(`menuqr_cart_${slug}`, JSON.stringify(carrinho)); } catch {}
   }, [carrinho, slug]);
 
   useEffect(() => {
@@ -52,18 +66,13 @@ export default function PublicMenu() {
     const measure = measureRef.current;
     if (!nav || !measure || !measure.children.length) return;
     const navWidth = nav.offsetWidth;
-    const GAP = 18;
-    const MAIS_WIDTH = 72;
+    const GAP = 18, MAIS_WIDTH = 72;
     const tabs = Array.from(measure.children);
-    let usado = 0;
-    let novoCorte = tabs.length;
+    let usado = 0, novoCorte = tabs.length;
     for (let i = 0; i < tabs.length; i++) {
       const w = tabs[i].offsetWidth;
       const eUltimo = i === tabs.length - 1;
-      if (usado + w + (eUltimo ? 0 : GAP + MAIS_WIDTH) > navWidth) {
-        novoCorte = i;
-        break;
-      }
+      if (usado + w + (eUltimo ? 0 : GAP + MAIS_WIDTH) > navWidth) { novoCorte = i; break; }
       usado += w + GAP;
     }
     setCorte(novoCorte < tabs.length ? novoCorte : null);
@@ -81,104 +90,152 @@ export default function PublicMenu() {
 
   useEffect(() => {
     if (!dropdownAberto) return;
-    const handler = (e) => {
-      if (!e.target.closest('.cat-mais-wrapper')) setDropdownAberto(false);
-    };
+    const handler = (e) => { if (!e.target.closest('.cat-mais-wrapper')) setDropdownAberto(false); };
     document.addEventListener('click', handler);
     return () => document.removeEventListener('click', handler);
   }, [dropdownAberto]);
 
-  const adicionarAoCarrinho = (item) => {
-    setCarrinho((anterior) => {
-      const itemExistente = anterior.find((i) => i.id === item.id);
-      if (itemExistente) return anterior.map((i) => i.id === item.id ? { ...i, qty: i.qty + 1 } : i);
-      return [...anterior, { ...item, qty: 1 }];
+  // ── Carrinho ────────────────────────────────────────────────────────────────
+
+  const totalDoCarrinho = carrinho.reduce((soma, e) => soma + calcularPrecoUnitario(e) * e.qty, 0);
+  const quantidadeNoCarrinho = carrinho.reduce((soma, e) => soma + e.qty, 0);
+
+  const adicionarSemOpcoes = (item) => {
+    setCarrinho((prev) => {
+      const existente = prev.find((e) => e.uid === item.id);
+      if (existente) return prev.map((e) => e.uid === item.id ? { ...e, qty: e.qty + 1 } : e);
+      return [...prev, { uid: item.id, id: item.id, name: item.name, price: item.price, qty: 1, opcoesGrupos: [] }];
     });
   };
 
-  const removerDoCarrinho = (idDoItem) => {
-    setCarrinho((anterior) => {
-      const itemExistente = anterior.find((i) => i.id === idDoItem);
-      if (itemExistente?.qty === 1) return anterior.filter((i) => i.id !== idDoItem);
-      return anterior.map((i) => i.id === idDoItem ? { ...i, qty: i.qty - 1 } : i);
+  const removerSemOpcoes = (itemId) => {
+    setCarrinho((prev) => {
+      const existente = prev.find((e) => e.uid === itemId);
+      if (existente?.qty === 1) return prev.filter((e) => e.uid !== itemId);
+      return prev.map((e) => e.uid === itemId ? { ...e, qty: e.qty - 1 } : e);
     });
   };
+
+  const incrementarEntrada = (uid) =>
+    setCarrinho((prev) => prev.map((e) => e.uid === uid ? { ...e, qty: e.qty + 1 } : e));
+
+  const decrementarEntrada = (uid) =>
+    setCarrinho((prev) => {
+      const e = prev.find((x) => x.uid === uid);
+      if (e?.qty === 1) return prev.filter((x) => x.uid !== uid);
+      return prev.map((x) => x.uid === uid ? { ...x, qty: x.qty - 1 } : x);
+    });
 
   const limparCarrinho = () => { setCarrinho([]); setConfirmandoLimpeza(false); };
 
-  const totalDoCarrinho = carrinho.reduce((soma, i) => soma + parseFloat(i.price) * i.qty, 0);
-  const quantidadeNoCarrinho = carrinho.reduce((soma, i) => soma + i.qty, 0);
-
-  const formatarPreco = (valor) =>
-    parseFloat(valor).toFixed(2).replace('.', ',');
+  const fecharCarrinho = () => { setCarrinhoAberto(false); setConfirmandoLimpeza(false); };
 
   const enviarPedidoWhatsApp = () => {
     if (!menu?.restaurant?.whatsapp) return;
-    const linhasDoPedido = carrinho.map(
-      (i) => `• ${i.name} x${i.qty} — R$ ${(parseFloat(i.price) * i.qty).toFixed(2)}`
-    );
-    const mensagem = [
-      `Olá! Gostaria de fazer um pedido:`,
-      ``,
-      ...linhasDoPedido,
-      ``,
-      `*Total: R$ ${totalDoCarrinho.toFixed(2)}*`,
-    ].join('\n');
-    const numero = `55${menu.restaurant.whatsapp}`;
-    window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`, '_blank');
+    const linhas = carrinho.map((e) => {
+      const opStr = (e.opcoesGrupos || [])
+        .filter((g) => g.opcoesSelecionadas.length > 0)
+        .map((g) => g.opcoesSelecionadas.map((o) => o.opcaoNome).join(', '))
+        .join(' · ');
+      const preco = (calcularPrecoUnitario(e) * e.qty).toFixed(2);
+      return `• ${e.name}${opStr ? ` (${opStr})` : ''} x${e.qty} — R$ ${preco}`;
+    });
+    const mensagem = [`Olá! Gostaria de fazer um pedido:`, '', ...linhas, '', `*Total: R$ ${totalDoCarrinho.toFixed(2)}*`].join('\n');
+    window.open(`https://wa.me/55${menu.restaurant.whatsapp}?text=${encodeURIComponent(mensagem)}`, '_blank');
   };
 
-  if (carregando) {
-    return (
-      <div className="public-loading">
-        <div className="spinner" />
-        <p>Carregando cardápio...</p>
-      </div>
-    );
-  }
+  // ── Modal de produto ────────────────────────────────────────────────────────
 
-  if (naoEncontrado) {
-    return (
-      <div className="public-notfound">
-        <h2>Cardápio não encontrado</h2>
-        <p>O link que você acessou não existe ou foi removido.</p>
-      </div>
-    );
-  }
+  const abrirModal = (item) => {
+    setItemModal(item);
+    setSelecoes({});
+    setQtdModal(1);
+  };
+
+  const fecharModal = () => setItemModal(null);
+
+  const toggleOpcao = (grupo, opcaoId) => {
+    const atual = selecoes[grupo.id] || [];
+    if (grupo.max_qty === 1) {
+      // radio: substitui
+      setSelecoes({ ...selecoes, [grupo.id]: [opcaoId] });
+    } else {
+      // checkbox: adiciona/remove até max_qty
+      if (atual.includes(opcaoId)) {
+        setSelecoes({ ...selecoes, [grupo.id]: atual.filter((id) => id !== opcaoId) });
+      } else if (atual.length < grupo.max_qty) {
+        setSelecoes({ ...selecoes, [grupo.id]: [...atual, opcaoId] });
+      }
+    }
+  };
+
+  const modalValido = () => {
+    if (!itemModal) return false;
+    return (itemModal.option_groups || []).every((g) => {
+      if (!g.required) return true;
+      return (selecoes[g.id] || []).length >= (g.min_qty || 1);
+    });
+  };
+
+  const precoModal = () => {
+    if (!itemModal) return 0;
+    const acrescimos = (itemModal.option_groups || []).reduce((soma, g) => {
+      return soma + (selecoes[g.id] || []).reduce((s, optId) => {
+        const opt = g.options.find((o) => o.id === optId);
+        return s + parseFloat(opt?.price_add || 0);
+      }, 0);
+    }, 0);
+    return (parseFloat(itemModal.price) + acrescimos) * qtdModal;
+  };
+
+  const adicionarDoModal = () => {
+    if (!modalValido()) return;
+    const opcoesGrupos = (itemModal.option_groups || []).map((g) => ({
+      grupoId: g.id,
+      grupoNome: g.name,
+      opcoesSelecionadas: (selecoes[g.id] || []).map((optId) => {
+        const opt = g.options.find((o) => o.id === optId);
+        return { opcaoId: optId, opcaoNome: opt?.name || '', acrescimo: opt?.price_add || 0 };
+      }),
+    }));
+
+    // fingerprint para deduplicar entradas com as mesmas opções
+    const fp = opcoesGrupos.map((g) => g.opcoesSelecionadas.map((o) => o.opcaoId).join(',')).join('|');
+    const uid = `${itemModal.id}_${fp}`;
+
+    setCarrinho((prev) => {
+      const existente = prev.find((e) => e.uid === uid);
+      if (existente) return prev.map((e) => e.uid === uid ? { ...e, qty: e.qty + qtdModal } : e);
+      return [...prev, { uid, id: itemModal.id, name: itemModal.name, price: itemModal.price, qty: qtdModal, opcoesGrupos }];
+    });
+    fecharModal();
+  };
+
+  // ────────────────────────────────────────────────────────────────────────────
+
+  if (carregando) return (
+    <div className="public-loading"><div className="spinner" /><p>Carregando cardápio...</p></div>
+  );
+  if (naoEncontrado) return (
+    <div className="public-notfound"><h2>Cardápio não encontrado</h2><p>O link que você acessou não existe ou foi removido.</p></div>
+  );
 
   const { restaurant, categories } = menu;
 
   return (
     <div className="public-menu">
-      {/* ── Cabeçalho do restaurante ──────────────────────────── */}
+      {/* ── Cabeçalho ────────────────────────────────────────── */}
       <header className="public-header">
         <div className="restaurant-row">
           {restaurant.logo_url ? (
             <img src={restaurant.logo_url} alt={restaurant.name} className="public-logo" />
           ) : (
-            <div className="public-logo" style={{
-              background: 'var(--ink)',
-              color: 'var(--paper)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontFamily: 'var(--serif)',
-              fontStyle: 'italic',
-              fontSize: 28,
-            }}>
+            <div className="public-logo" style={{ background: 'var(--ink)', color: 'var(--paper)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 28 }}>
               {restaurant.name.charAt(0)}
             </div>
           )}
           <div>
-            <div style={{
-              font: '500 11px var(--sans)',
-              letterSpacing: '0.18em',
-              textTransform: 'uppercase',
-              color: 'var(--ink-3)',
-              marginBottom: 4,
-            }}>
-              Cardápio
-            </div>
+            <div style={{ font: '500 11px var(--sans)', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 4 }}>Cardápio</div>
             <h1>{restaurant.name}</h1>
           </div>
         </div>
@@ -188,42 +245,29 @@ export default function PublicMenu() {
         <div className="public-empty">Cardápio em breve...</div>
       ) : (
         <>
-          {/* ── Abas de categoria ─────────────────────────────── */}
+          {/* ── Abas de categoria ──────────────────────────── */}
           <div ref={measureRef} className="cat-measure" aria-hidden="true">
-            {categories.map((cat) => (
-              <button key={cat.id} className="cat-tab">{cat.name}</button>
-            ))}
+            {categories.map((cat) => <button key={cat.id} className="cat-tab">{cat.name}</button>)}
           </div>
           <nav ref={navRef} className="category-nav">
-            {categories.map((categoria, i) =>
+            {categories.map((cat, i) =>
               corte === null || i < corte ? (
-                <button
-                  key={categoria.id}
-                  className={`cat-tab ${categoriaAtiva === categoria.id ? 'active' : ''}`}
-                  onClick={() => setCategoriaAtiva(categoria.id)}
-                >
-                  {categoria.name}
-                </button>
+                <button key={cat.id} className={`cat-tab ${categoriaAtiva === cat.id ? 'active' : ''}`}
+                  onClick={() => setCategoriaAtiva(cat.id)}>{cat.name}</button>
               ) : null
             )}
             {corte !== null && (
               <div className="cat-mais-wrapper">
-                <button
-                  className={`cat-mais ${categories.slice(corte).some((c) => c.id === categoriaAtiva) ? 'active' : ''}`}
-                  onClick={() => setDropdownAberto((a) => !a)}
-                >
+                <button className={`cat-mais ${categories.slice(corte).some((c) => c.id === categoriaAtiva) ? 'active' : ''}`}
+                  onClick={() => setDropdownAberto((a) => !a)}>
                   {categories.slice(corte).some((c) => c.id === categoriaAtiva)
-                    ? categories.find((c) => c.id === categoriaAtiva)?.name
-                    : 'Mais'} ▾
+                    ? categories.find((c) => c.id === categoriaAtiva)?.name : 'Mais'} ▾
                 </button>
                 {dropdownAberto && (
                   <div className="cat-dropdown">
                     {categories.slice(corte).map((cat) => (
-                      <button
-                        key={cat.id}
-                        className={`cat-dropdown-item ${categoriaAtiva === cat.id ? 'active' : ''}`}
-                        onClick={() => { setCategoriaAtiva(cat.id); setDropdownAberto(false); }}
-                      >
+                      <button key={cat.id} className={`cat-dropdown-item ${categoriaAtiva === cat.id ? 'active' : ''}`}
+                        onClick={() => { setCategoriaAtiva(cat.id); setDropdownAberto(false); }}>
                         {cat.name}
                       </button>
                     ))}
@@ -233,24 +277,21 @@ export default function PublicMenu() {
             )}
           </nav>
 
-          {/* ── Itens do cardápio ─────────────────────────────── */}
+          {/* ── Itens ──────────────────────────────────────── */}
           <div className="menu-content">
             {categories.map((categoria) => (
-              <section
-                key={categoria.id}
-                className={`category-section ${categoriaAtiva === categoria.id ? '' : 'hidden'}`}
-              >
+              <section key={categoria.id} className={`category-section ${categoriaAtiva === categoria.id ? '' : 'hidden'}`}>
                 <div className="category-header">
                   <div className="category-eyebrow">{categoria.items.length} {categoria.items.length === 1 ? 'item' : 'itens'}</div>
                   <div className="category-title-serif">{categoria.name}</div>
                 </div>
-
                 {categoria.items.length === 0 ? (
                   <p className="public-empty-cat">Nenhum item disponível nesta categoria.</p>
                 ) : (
                   <div className="menu-list">
                     {categoria.items.map((item) => {
-                      const estaNoCarrinho = carrinho.find((i) => i.id === item.id);
+                      const temOpcoes = item.option_groups?.length > 0;
+                      const entradaSemOpcoes = !temOpcoes ? carrinho.find((e) => e.uid === item.id) : null;
                       return (
                         <div key={item.id} className="menu-item">
                           <div className="menu-item-body">
@@ -259,25 +300,29 @@ export default function PublicMenu() {
                               <span className="menu-item-leader" aria-hidden="true" />
                               <span className="menu-item-price">R$ {formatarPreco(item.price)}</span>
                             </div>
-                            {item.description && (
-                              <p className="menu-item-desc">{item.description}</p>
-                            )}
+                            {item.description && <p className="menu-item-desc">{item.description}</p>}
                             {restaurant.whatsapp && (
-                              estaNoCarrinho ? (
+                              temOpcoes ? (
+                                <button className="menu-item-add" onClick={() => abrirModal(item)}>
+                                  + Escolher
+                                </button>
+                              ) : entradaSemOpcoes ? (
                                 <div className="qty-control">
-                                  <button className="qty-btn" onClick={() => removerDoCarrinho(item.id)}>−</button>
-                                  <span className="qty-value">{estaNoCarrinho.qty}</span>
-                                  <button className="qty-btn" onClick={() => adicionarAoCarrinho(item)}>+</button>
+                                  <button className="qty-btn" onClick={() => removerSemOpcoes(item.id)}>−</button>
+                                  <span className="qty-value">{entradaSemOpcoes.qty}</span>
+                                  <button className="qty-btn" onClick={() => adicionarSemOpcoes(item)}>+</button>
                                 </div>
                               ) : (
-                                <button className="menu-item-add" onClick={() => adicionarAoCarrinho(item)}>
+                                <button className="menu-item-add" onClick={() => adicionarSemOpcoes(item)}>
                                   + Adicionar
                                 </button>
                               )
                             )}
                           </div>
                           {item.image_url && (
-                            <img className="menu-item-photo" src={item.image_url} alt={item.name} />
+                            <img className="menu-item-photo" src={item.image_url} alt={item.name}
+                              onClick={temOpcoes ? () => abrirModal(item) : undefined}
+                              style={temOpcoes ? { cursor: 'pointer' } : undefined} />
                           )}
                         </div>
                       );
@@ -290,41 +335,32 @@ export default function PublicMenu() {
         </>
       )}
 
-      {/* ── Carrinho: FAB via portal (mobile) ou barra persistente (tablet/pc) ── */}
+      {/* ── FAB (mobile) via portal ───────────────────────── */}
       {restaurant.whatsapp && isMobile && createPortal(
-        <button
-          className="cart-fab"
-          onClick={() => setCarrinhoAberto(true)}
-          aria-label={quantidadeNoCarrinho > 0 ? `Ver carrinho — ${quantidadeNoCarrinho} ${quantidadeNoCarrinho === 1 ? 'item' : 'itens'}` : 'Carrinho vazio'}
-        >
+        <button className="cart-fab" onClick={() => setCarrinhoAberto(true)}
+          aria-label={quantidadeNoCarrinho > 0 ? `Ver carrinho — ${quantidadeNoCarrinho} itens` : 'Carrinho vazio'}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
-            <line x1="3" y1="6" x2="21" y2="6" />
-            <path d="M16 10a4 4 0 01-8 0" />
+            <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 01-8 0" />
           </svg>
-          {quantidadeNoCarrinho > 0 && (
-            <span className="cart-fab-count">{quantidadeNoCarrinho}</span>
-          )}
+          {quantidadeNoCarrinho > 0 && <span className="cart-fab-count">{quantidadeNoCarrinho}</span>}
         </button>,
         document.body
       )}
 
+      {/* ── Barra inferior (tablet/pc) ───────────────────── */}
       {restaurant.whatsapp && !isMobile && (
         <div className="order-bar">
           {carrinho.length === 0 ? (
             <div className="order-bar-empty">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <path d="M16 10a4 4 0 01-8 0" />
+                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 01-8 0" />
               </svg>
               Seu pedido está vazio
             </div>
           ) : (
             <button className="order-bar-btn" onClick={() => setCarrinhoAberto(true)}>
               <span style={{ display: 'flex', alignItems: 'center' }}>
-                <span className="order-bar-count">{quantidadeNoCarrinho}</span>
-                Ver pedido
+                <span className="order-bar-count">{quantidadeNoCarrinho}</span>Ver pedido
               </span>
               <span className="order-bar-total">R$ {formatarPreco(totalDoCarrinho)}</span>
             </button>
@@ -332,39 +368,39 @@ export default function PublicMenu() {
         </div>
       )}
 
-      {/* ── Gaveta do carrinho ────────────────────────────────── */}
+      {/* ── Gaveta do carrinho ────────────────────────────── */}
       {carrinhoAberto && (
-        <div className="cart-overlay" onClick={() => setCarrinhoAberto(false); setConfirmandoLimpeza(false)}>
+        <div className="cart-overlay" onClick={fecharCarrinho}>
           <div className="cart-drawer" onClick={(e) => e.stopPropagation()}>
             <div className="cart-header">
               <div>
-                <div style={{
-                  font: '500 11px var(--sans)',
-                  letterSpacing: '0.18em',
-                  textTransform: 'uppercase',
-                  color: 'var(--ink-3)',
-                  marginBottom: 4,
-                }}>
-                  Seu pedido
-                </div>
+                <div style={{ font: '500 11px var(--sans)', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 4 }}>Seu pedido</div>
                 <h3>Comanda</h3>
               </div>
-              <button className="cart-close" onClick={() => setCarrinhoAberto(false); setConfirmandoLimpeza(false)}>✕</button>
+              <button className="cart-close" onClick={fecharCarrinho}>✕</button>
             </div>
 
             <div className="cart-items">
-              {carrinho.map((item) => (
-                <div key={item.id} className="cart-item">
+              {carrinho.map((entrada) => (
+                <div key={entrada.uid} className="cart-item">
                   <div className="cart-item-info">
-                    <span className="cart-item-name">{item.name}</span>
+                    <span className="cart-item-name">{entrada.name}</span>
+                    {entrada.opcoesGrupos?.some((g) => g.opcoesSelecionadas.length > 0) && (
+                      <span className="cart-item-opcoes">
+                        {entrada.opcoesGrupos
+                          .filter((g) => g.opcoesSelecionadas.length > 0)
+                          .map((g) => g.opcoesSelecionadas.map((o) => o.opcaoNome).join(', '))
+                          .join(' · ')}
+                      </span>
+                    )}
                     <span className="cart-item-price">
-                      R$ {formatarPreco(parseFloat(item.price) * item.qty)}
+                      R$ {formatarPreco(calcularPrecoUnitario(entrada) * entrada.qty)}
                     </span>
                   </div>
                   <div className="qty-control">
-                    <button className="qty-btn" onClick={() => removerDoCarrinho(item.id)}>−</button>
-                    <span className="qty-value">{item.qty}</span>
-                    <button className="qty-btn" onClick={() => adicionarAoCarrinho(item)}>+</button>
+                    <button className="qty-btn" onClick={() => decrementarEntrada(entrada.uid)}>−</button>
+                    <span className="qty-value">{entrada.qty}</span>
+                    <button className="qty-btn" onClick={() => incrementarEntrada(entrada.uid)}>+</button>
                   </div>
                 </div>
               ))}
@@ -392,6 +428,79 @@ export default function PublicMenu() {
               ) : (
                 <button className="btn-clear" onClick={() => setConfirmandoLimpeza(true)}>Limpar carrinho</button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de produto (com opções) ─────────────────── */}
+      {itemModal && (
+        <div className="produto-modal-overlay" onClick={fecharModal}>
+          <div className="produto-modal" onClick={(e) => e.stopPropagation()}>
+            {/* Scroll area */}
+            <div className="produto-modal-scroll">
+              {itemModal.image_url && (
+                <img className="produto-modal-foto" src={itemModal.image_url} alt={itemModal.name} />
+              )}
+              <div className="produto-modal-info">
+                <h2 className="produto-modal-nome">{itemModal.name}</h2>
+                {itemModal.description && <p className="produto-modal-desc">{itemModal.description}</p>}
+                <span className="produto-modal-preco-base">A partir de R$ {formatarPreco(itemModal.price)}</span>
+              </div>
+
+              {(itemModal.option_groups || []).map((grupo) => {
+                const sels = selecoes[grupo.id] || [];
+                return (
+                  <div key={grupo.id} className="option-group">
+                    <div className="option-group-header">
+                      <span className="option-group-nome">{grupo.name}</span>
+                      <span className={`option-group-tag ${grupo.required ? 'required' : 'optional'}`}>
+                        {grupo.required ? 'Obrigatório' : 'Opcional'}
+                      </span>
+                    </div>
+                    <div className="option-group-hint">
+                      {grupo.max_qty === 1 ? 'Escolha 1 opção' : `Escolha até ${grupo.max_qty} opções`}
+                    </div>
+
+                    {grupo.options.map((opt) => {
+                      const selecionado = sels.includes(opt.id);
+                      const desabilitado = !selecionado && sels.length >= grupo.max_qty;
+                      return (
+                        <label key={opt.id} className={`option-label ${selecionado ? 'selected' : ''} ${desabilitado ? 'disabled' : ''}`}>
+                          <input
+                            type={grupo.max_qty === 1 ? 'radio' : 'checkbox'}
+                            name={`group_${grupo.id}`}
+                            checked={selecionado}
+                            disabled={desabilitado}
+                            onChange={() => toggleOpcao(grupo, opt.id)}
+                          />
+                          <span className="option-check" />
+                          <span className="option-nome">{opt.name}</span>
+                          <span className="option-price">
+                            {parseFloat(opt.price_add) > 0 ? `+R$ ${formatarPreco(opt.price_add)}` : 'Grátis'}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer fixo */}
+            <div className="produto-modal-footer">
+              <div className="produto-modal-qty">
+                <button className="qty-btn" onClick={() => setQtdModal((q) => Math.max(1, q - 1))}>−</button>
+                <span className="qty-value">{qtdModal}</span>
+                <button className="qty-btn" onClick={() => setQtdModal((q) => q + 1)}>+</button>
+              </div>
+              <button
+                className={`produto-modal-add-btn ${!modalValido() ? 'disabled' : ''}`}
+                onClick={adicionarDoModal}
+                disabled={!modalValido()}
+              >
+                Adicionar · R$ {formatarPreco(precoModal())}
+              </button>
             </div>
           </div>
         </div>

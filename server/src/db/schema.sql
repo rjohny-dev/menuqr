@@ -66,12 +66,36 @@ CREATE TABLE IF NOT EXISTS token_blocklist (
 );
 CREATE INDEX IF NOT EXISTS idx_token_blocklist_expires ON token_blocklist(expires_at);
 
+-- Option groups per item (e.g. "Tamanho", "Sabor", "Complementos")
+CREATE TABLE IF NOT EXISTS item_option_groups (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  item_id     UUID NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  name        VARCHAR(100) NOT NULL,
+  required    BOOLEAN NOT NULL DEFAULT false,
+  min_qty     INTEGER NOT NULL DEFAULT 0,
+  max_qty     INTEGER NOT NULL DEFAULT 1,
+  "order"     INTEGER NOT NULL DEFAULT 0,
+  created_at  TIMESTAMP DEFAULT NOW()
+);
+
+-- Individual options within a group (e.g. "Pequeno", "Grande +R$5")
+CREATE TABLE IF NOT EXISTS item_options (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  group_id    UUID NOT NULL REFERENCES item_option_groups(id) ON DELETE CASCADE,
+  name        VARCHAR(100) NOT NULL,
+  price_add   DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (price_add >= 0),
+  "order"     INTEGER NOT NULL DEFAULT 0,
+  created_at  TIMESTAMP DEFAULT NOW()
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_restaurants_slug    ON restaurants(slug);
 CREATE INDEX IF NOT EXISTS idx_restaurants_user_id ON restaurants(user_id);
 CREATE INDEX IF NOT EXISTS idx_categories_rest_id  ON categories(restaurant_id);
 CREATE INDEX IF NOT EXISTS idx_items_category_id   ON items(category_id);
 CREATE INDEX IF NOT EXISTS idx_items_active        ON items(category_id, active);
+CREATE INDEX IF NOT EXISTS idx_option_groups_item  ON item_option_groups(item_id);
+CREATE INDEX IF NOT EXISTS idx_options_group       ON item_options(group_id);
 
 -- Migration: add missing columns if upgrading from old schema
 ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_attempts            INTEGER DEFAULT 0;
