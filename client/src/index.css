@@ -1224,7 +1224,7 @@ a { color: inherit; }
   letter-spacing: 0.01em;
 }
 
-/* ─── Cart FAB (mobile) ──────────────────────────────────── */
+/* ─── Cart FAB (mobile — renderizado via React portal) ───── */
 .cart-fab {
   position: fixed;
   bottom: 1.75rem;
@@ -1236,10 +1236,10 @@ a { color: inherit; }
   height: 62px;
   border-radius: 50%;
   cursor: pointer;
-  display: none; /* shown only on mobile via @media (max-width: 767px) */
+  display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 9999;
   box-shadow: 0 4px 16px rgba(200,70,46,0.35);
   transition: transform 0.15s, background 0.15s;
 }
@@ -1502,25 +1502,15 @@ a { color: inherit; }
   .dashboard-header h1 { font-size: 36px !important; }
 }
 
-/* ─── Carrinho: mobile = FAB, tablet/pc = barra inferior ── */
+/* ─── Carrinho: drawer mobile vs desktop ─────────────────── */
 @media (max-width: 767px) {
-  /* Mostra FAB, esconde barra */
-  .cart-fab { display: flex; }
-  .order-bar { display: none !important; }
-  /* Drawer ocupa tela toda no mobile */
   .cart-drawer { max-width: 100%; border-radius: 20px 20px 0 0; }
 }
 
 @media (min-width: 768px) {
-  /* Esconde FAB, mostra barra */
-  .cart-fab { display: none !important; }
   .order-bar { display: block; }
-  /* Drawer alinhado à direita e largura limitada em telas maiores */
   .cart-overlay { justify-content: flex-end; }
-  .cart-drawer {
-    max-width: 440px;
-    border-radius: 20px 20px 0 0;
-  }
+  .cart-drawer { max-width: 440px; border-radius: 20px 20px 0 0; }
   .cart-drawer::before { display: none; }
 }
 

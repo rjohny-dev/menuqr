@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams } from 'react-router-dom';
 import api from '../api';
 
@@ -15,6 +16,7 @@ export default function PublicMenu() {
     } catch { return []; }
   });
   const [carrinhoAberto, setCarrinhoAberto] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [corte, setCorte] = useState(null);
   const [dropdownAberto, setDropdownAberto] = useState(false);
   const navRef = useRef(null);
@@ -37,6 +39,12 @@ export default function PublicMenu() {
       localStorage.setItem(`menuqr_cart_${slug}`, JSON.stringify(carrinho));
     } catch {}
   }, [carrinho, slug]);
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
 
   const calcularCorte = useCallback(() => {
     const nav = navRef.current;
@@ -281,47 +289,46 @@ export default function PublicMenu() {
         </>
       )}
 
-      {/* ── Carrinho: FAB (mobile) + barra persistente (tablet/pc) ── */}
-      {restaurant.whatsapp && (
-        <>
-          {/* Mobile: botão flutuante */}
-          <button
-            className="cart-fab"
-            onClick={() => setCarrinhoAberto(true)}
-            aria-label={quantidadeNoCarrinho > 0 ? `Ver carrinho — ${quantidadeNoCarrinho} ${quantidadeNoCarrinho === 1 ? 'item' : 'itens'}` : 'Carrinho vazio'}
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <path d="M16 10a4 4 0 01-8 0" />
-            </svg>
-            {quantidadeNoCarrinho > 0 && (
-              <span className="cart-fab-count">{quantidadeNoCarrinho}</span>
-            )}
-          </button>
+      {/* ── Carrinho: FAB via portal (mobile) ou barra persistente (tablet/pc) ── */}
+      {restaurant.whatsapp && isMobile && createPortal(
+        <button
+          className="cart-fab"
+          onClick={() => setCarrinhoAberto(true)}
+          aria-label={quantidadeNoCarrinho > 0 ? `Ver carrinho — ${quantidadeNoCarrinho} ${quantidadeNoCarrinho === 1 ? 'item' : 'itens'}` : 'Carrinho vazio'}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <path d="M16 10a4 4 0 01-8 0" />
+          </svg>
+          {quantidadeNoCarrinho > 0 && (
+            <span className="cart-fab-count">{quantidadeNoCarrinho}</span>
+          )}
+        </button>,
+        document.body
+      )}
 
-          {/* Tablet/PC: barra sempre visível na parte inferior */}
-          <div className="order-bar">
-            {carrinho.length === 0 ? (
-              <div className="order-bar-empty">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
-                  <line x1="3" y1="6" x2="21" y2="6" />
-                  <path d="M16 10a4 4 0 01-8 0" />
-                </svg>
-                Seu pedido está vazio
-              </div>
-            ) : (
-              <button className="order-bar-btn" onClick={() => setCarrinhoAberto(true)}>
-                <span style={{ display: 'flex', alignItems: 'center' }}>
-                  <span className="order-bar-count">{quantidadeNoCarrinho}</span>
-                  Ver pedido
-                </span>
-                <span className="order-bar-total">R$ {formatarPreco(totalDoCarrinho)}</span>
-              </button>
-            )}
-          </div>
-        </>
+      {restaurant.whatsapp && !isMobile && (
+        <div className="order-bar">
+          {carrinho.length === 0 ? (
+            <div className="order-bar-empty">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <path d="M16 10a4 4 0 01-8 0" />
+              </svg>
+              Seu pedido está vazio
+            </div>
+          ) : (
+            <button className="order-bar-btn" onClick={() => setCarrinhoAberto(true)}>
+              <span style={{ display: 'flex', alignItems: 'center' }}>
+                <span className="order-bar-count">{quantidadeNoCarrinho}</span>
+                Ver pedido
+              </span>
+              <span className="order-bar-total">R$ {formatarPreco(totalDoCarrinho)}</span>
+            </button>
+          )}
+        </div>
       )}
 
       {/* ── Gaveta do carrinho ────────────────────────────────── */}
