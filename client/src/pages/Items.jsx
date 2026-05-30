@@ -21,6 +21,7 @@ export default function Items() {
   const [novoGrupo, setNovoGrupo] = useState(GRUPO_VAZIO);
   const [novaOpcaoPorGrupo, setNovaOpcaoPorGrupo] = useState({});
   const [grupoExpandido, setGrupoExpandido] = useState(null);
+  const [erroOpcoes, setErroOpcoes] = useState('');
 
   useEffect(() => {
     carregarItens();
@@ -110,6 +111,7 @@ export default function Items() {
   const adicionarGrupo = async (e) => {
     e.preventDefault();
     if (!novoGrupo.name.trim()) return;
+    setErroOpcoes('');
     try {
       const { data } = await api.post(`/option-groups/item/${idEmEdicao}`, {
         name: novoGrupo.name.trim(),
@@ -120,7 +122,9 @@ export default function Items() {
       setGruposDoItem([...gruposDoItem, data]);
       setNovoGrupo(GRUPO_VAZIO);
       setGrupoExpandido(data.id);
-    } catch {}
+    } catch (err) {
+      setErroOpcoes(err.response?.data?.error || 'Erro ao criar grupo. Tente novamente.');
+    }
   };
 
   const deletarGrupo = async (groupId) => {
@@ -129,7 +133,9 @@ export default function Items() {
       await api.delete(`/option-groups/${groupId}`);
       setGruposDoItem(gruposDoItem.filter((g) => g.id !== groupId));
       if (grupoExpandido === groupId) setGrupoExpandido(null);
-    } catch {}
+    } catch (err) {
+      setErroOpcoes(err.response?.data?.error || 'Erro ao deletar grupo.');
+    }
   };
 
   // ── Opções ──────────────────────────────────────────────────────────────────
@@ -138,6 +144,7 @@ export default function Items() {
     e.preventDefault();
     const form = novaOpcaoPorGrupo[groupId] || {};
     if (!form.name?.trim()) return;
+    setErroOpcoes('');
     try {
       const { data } = await api.post(`/option-groups/${groupId}/options`, {
         name: form.name.trim(),
@@ -147,7 +154,9 @@ export default function Items() {
         g.id === groupId ? { ...g, options: [...g.options, data] } : g
       ));
       setNovaOpcaoPorGrupo({ ...novaOpcaoPorGrupo, [groupId]: { name: '', price_add: '' } });
-    } catch {}
+    } catch (err) {
+      setErroOpcoes(err.response?.data?.error || 'Erro ao criar opção. Tente novamente.');
+    }
   };
 
   const deletarOpcao = async (groupId, optionId) => {
@@ -156,7 +165,9 @@ export default function Items() {
       setGruposDoItem(gruposDoItem.map((g) =>
         g.id === groupId ? { ...g, options: g.options.filter((o) => o.id !== optionId) } : g
       ));
-    } catch {}
+    } catch (err) {
+      setErroOpcoes(err.response?.data?.error || 'Erro ao deletar opção.');
+    }
   };
 
   const setOpcaoForm = (groupId, field, value) =>
@@ -269,6 +280,10 @@ export default function Items() {
                     )}
                   </div>
                 ))}
+
+                {erroOpcoes && (
+                  <div className="error-message" style={{ marginBottom: 12 }}>{erroOpcoes}</div>
+                )}
 
                 <form className="opcao-grupo-novo-form" onSubmit={adicionarGrupo}>
                   <div className="opcao-grupo-novo-titulo">Novo grupo</div>
